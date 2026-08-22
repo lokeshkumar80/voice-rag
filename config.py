@@ -108,9 +108,15 @@ RERANK_MODEL = os.getenv("RERANK_MODEL", "BAAI/bge-reranker-v2-m3")
 # It cannot be applied to the fused score: fusion min-max normalizes each signal
 # over the candidate set, which pins the best candidate at ~1.0 for every query
 # -- pure gibberish scores 1.0000 -- so a fused threshold can never fire. The
-# cosine is absolute and comparable across queries. Calibrated in
-# scripts/calibrate_guardrail.py against on-topic vs off-topic queries.
-MIN_DENSE_SCORE = float(os.getenv("MIN_DENSE_SCORE", "0.50"))
+# cosine is absolute and comparable across queries.
+#
+# 0.58 comes from calibrating against HARD negatives: real MS MARCO queries whose
+# passages were never indexed. An earlier 0.50 was calibrated against gibberish
+# ("asdf qwerty"), which scores at most 0.434 here -- so it scored 0.93 balanced
+# accuracy and then blocked only 26% of realistic unanswerable queries. Easy
+# negatives give you a number, not a guarantee. Re-derive with
+# scripts/calibrate_guardrail.py and always cross-check scripts/faithfulness.py.
+MIN_DENSE_SCORE = float(os.getenv("MIN_DENSE_SCORE", "0.58"))
 MIN_TRANSCRIPT_CHARS = int(os.getenv("MIN_TRANSCRIPT_CHARS", "3"))
 # Grounding check: fraction of answer content words that must appear in context.
 MIN_GROUNDING_OVERLAP = float(os.getenv("MIN_GROUNDING_OVERLAP", "0.35"))

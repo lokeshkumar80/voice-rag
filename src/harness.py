@@ -32,7 +32,12 @@ class Pipeline:
             audio_filename: str = "audio.webm",
             text: Optional[str] = None,
             use_rerank: bool = config.USE_RERANK,
-            generation_mode: Optional[str] = None) -> PipelineResult:
+            generation_mode: Optional[str] = None,
+            guardrails_enabled: bool = True) -> PipelineResult:
+        # guardrails_enabled=False bypasses all three gates. It exists so
+        # scripts/faithfulness.py can measure what the guardrails actually buy:
+        # "cuts ungrounded answers" is meaningless without the unguarded
+        # baseline to compare against.
         timing = StageTiming()
         res = PipelineResult(ok=False, timing=timing)
 
@@ -57,7 +62,7 @@ class Pipeline:
 
         # ---- Guardrail: input ----
         g0 = time.perf_counter()
-        ok, reason = guardrails.check_input(transcript)
+        ok, reason = guardrails.check_input(transcript) if guardrails_enabled else (True, "")
         timing.guardrail_ms += (time.perf_counter() - g0) * 1000
         if not ok:
             res.reason, res.abstained = reason, True
@@ -72,7 +77,7 @@ class Pipeline:
 
         # ---- Guardrail: off-topic ----
         g0 = time.perf_counter()
-        ok, reason = guardrails.check_retrieval(contexts)
+        ok, reason = guardrails.check_retrieval(contexts) if guardrails_enabled else (True, "")
         timing.guardrail_ms += (time.perf_counter() - g0) * 1000
         if not ok:
             res.reason, res.abstained = reason, True
@@ -88,7 +93,8 @@ class Pipeline:
 
         # ---- Guardrail: grounding / hallucination ----
         g0 = time.perf_counter()
-        grounded, greason = guardrails.check_grounding(answer, contexts)
+        grounded, greason = (guardrails.check_grounding(answer, contexts)
+                             if guardrails_enabled else (True, ""))
         timing.guardrail_ms += (time.perf_counter() - g0) * 1000
         res.grounded = grounded
         if not grounded:

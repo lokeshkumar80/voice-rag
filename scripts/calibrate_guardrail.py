@@ -8,8 +8,15 @@ it can actually answer. So we measure both distributions and choose the cut.
 
   ON-TOPIC  : real queries from the same validation rows the index was built
               from -- these have a gold passage in the corpus by construction.
-  OFF-TOPIC : gibberish, and questions about things demonstrably not in a
-              500-row MSMARCO slice.
+  OFF-TOPIC : real MS MARCO queries from rows *after* the indexed slice. Natural,
+              on-domain questions whose passages were simply never indexed.
+
+⚠ The off-topic set used to be hand-written nonsense ("what is the capital of
+Mars", "asdf qwerty"). That was far too easy: gibberish sits far from everything
+in embedding space, so it produced a threshold of 0.50 that looked excellent
+(0.93 balanced accuracy) and then blocked only **26%** of realistic unanswerable
+queries in scripts/faithfulness.py. Calibrating a guardrail on easy negatives
+gives you a number, not a guarantee. Hard negatives are the whole point.
 
 Run:  python scripts/calibrate_guardrail.py
 """
@@ -25,33 +32,33 @@ import config
 from src.indexer import HybridIndex
 from src.retriever import Retriever
 
-OFF_TOPIC = [
+# Kept only as a sanity check -- these should be blocked by any sane threshold.
+# They are NOT the calibration set; see the docstring.
+TRIVIAL_NEGATIVES = [
     "asdf qwerty zxcv",
     "zzzz plugh xyzzy frobnicate",
     "What is the capital of Mars in the year 3000?",
-    "Who won the 2047 Martian Grand Prix?",
-    "मंगल ग्रह की राजधानी क्या है?",
-    "What is my bank account password?",
-    "Explain the plot of a movie that was never made.",
-    "क्या आप मुझे कल का लॉटरी नंबर बता सकते हैं?",
-    "How many purple elephants live inside the sun?",
-    "Translate this sentence into a language that does not exist.",
 ]
 
 
-def on_topic_queries(n: int) -> list[str]:
-    """Queries from the same rows ingest.py indexed -> answerable by construction."""
+def query_sets(n: int) -> tuple[list[str], list[str]]:
+    """(on_topic, off_topic): in-slice queries vs real out-of-slice queries."""
     from datasets import load_dataset
     ds = load_dataset("parquet", data_files=config.data_files(),
                       split=config.SPLIT, streaming=True)
-    out = []
+    on, off = [], []
     for i, row in enumerate(ds):
-        if i >= config.MAX_ROWS or len(out) >= n:
-            break
         q = (row.get("query") or "").strip()
-        if q:
-            out.append(q)
-    return out
+        if not q:
+            continue
+        if i < config.MAX_ROWS:
+            if len(on) < n:
+                on.append(q)
+        elif len(off) < n:
+            off.append(q)
+        if len(on) >= n and len(off) >= n:
+            break
+    return on, off
 
 
 def best_dense(retr: Retriever, queries: list[str]) -> np.ndarray:
@@ -67,8 +74,12 @@ def main():
         raise SystemExit("No index found. Run `python ingest.py` first.")
     retr = Retriever(HybridIndex.load())
 
-    on = best_dense(retr, on_topic_queries(150))
-    off = best_dense(retr, OFF_TOPIC)
+    on_q, off_q = query_sets(150)
+    on = best_dense(retr, on_q)
+    off = best_dense(retr, off_q)
+    trivial = best_dense(retr, TRIVIAL_NEGATIVES)
+    print(f"\n(sanity) trivial gibberish max dense score: {trivial.max():.3f} "
+          f"-- easy negatives; not what we calibrate on")
 
     print(f"\non-topic  n={len(on):<4} mean={on.mean():.3f}  "
           f"p05={np.percentile(on,5):.3f}  p25={np.percentile(on,25):.3f}  min={on.min():.3f}")
@@ -89,9 +100,9 @@ def main():
     print("-" * 62)
     print(f"\nBest balanced threshold: MIN_DENSE_SCORE={best_t:.2f} "
           f"(balanced accuracy {best_score:.3f})")
-    print("Note: the two distributions overlap, so this is a recall/abstention")
-    print("trade-off, not a clean separation. Lower it to answer more, raise it")
-    print("to abstain more.")
+    print("The distributions overlap heavily on hard negatives, so this is a")
+    print("recall/abstention trade-off, not a clean separation. Cross-check any")
+    print("threshold change with scripts/faithfulness.py before trusting it.")
 
 
 if __name__ == "__main__":

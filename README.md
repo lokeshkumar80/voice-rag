@@ -16,7 +16,7 @@ audio ─▶ STT ─▶ [input guardrail] ─▶ embed+retrieve ─▶ [off-topi
 | 3. <200 ms latency | local embed + FAISS; retrieval budget measured separately from STT/LLM |
 | 4. P50/P70/P100 analytics | `benchmark.py` |
 | 5. Harness | `src/harness.py` (staged orchestration, retries, structured Pydantic I/O, graceful degradation) |
-| 6. Guardrails | `src/guardrails.py` (input safety, off-topic abstain, hallucination/grounding check) |
+| 6. Guardrails | `src/guardrails.py` (input safety, off-topic abstain, hallucination/grounding check); measured in `scripts/faithfulness.py` |
 
 ## About the 200 ms target — read this
 The full voice path can't hit 200 ms: STT is a network call (~300 ms–1 s) and any
@@ -164,6 +164,35 @@ default because it wins nDCG@10, produces the smallest index, and never cuts
 mid-sentence — which matters here because the extractive generator returns whole
 sentences.
 
+### What the guardrails buy — `python scripts/faithfulness.py --n 150`
+Same queries, run twice: `guardrails_enabled=True` vs `False`.
+
+| | answers *answerable* | answers *unanswerable* |
+|---|---|---|
+| guardrails OFF | 100.0% | 100.0% |
+| **guardrails ON** | **86.0%** | **20.0%** |
+
+**Ungrounded answers on unanswerable queries: 100% → 20% — an 80% relative
+reduction — at a cost of 14 points of coverage.** Both halves matter: a guardrail
+that abstained on everything would post a perfect 0% hallucination rate.
+
+The negative set is the part that makes this real. It is *not* hand-written
+nonsense; it is real MS MARCO queries from rows **after** the indexed slice —
+natural, on-domain questions whose passages simply were never indexed.
+
+#### The mistake worth reading
+The abstention threshold was originally calibrated against gibberish
+("asdf qwerty", "capital of Mars"). It scored **0.93 balanced accuracy** and
+looked finished. Measured against realistic negatives, that same threshold
+blocked only **26%** of them.
+
+Gibberish maxes out at a **0.434** cosine here; real unanswerable queries reach
+**0.719**. Easy negatives sit so far from everything in embedding space that they
+validate almost any threshold. Recalibrating on hard negatives moved
+`MIN_DENSE_SCORE` 0.50 → 0.58 and took the block rate from 26% to 80%.
+
+Calibrating a safety mechanism on easy cases gives you a number, not a guarantee.
+
 ### Why HYBRID_ALPHA is 0.9 — `python eval.py --rows 500 --sweep`
 | alpha | 0.0 | 0.4 | 0.6 | 0.8 | **0.9** | 1.0 |
 |---|---|---|---|---|---|---|
@@ -222,7 +251,9 @@ ingest.py          dataset -> chunks -> index
 benchmark.py       P50/P70/P100 analytics
 eval.py            IR metrics vs gold labels (+ --sweep for the alpha grid)
 scripts/
-  calibrate_guardrail.py   picks MIN_DENSE_SCORE from on- vs off-topic scores
+  fetch_dataset.py         cache the parquet locally (resumable, stall-safe)
+  calibrate_guardrail.py   picks MIN_DENSE_SCORE from HARD negatives
+  faithfulness.py          what the guardrails buy: guardrails on vs off
 app.py             FastAPI server + endpoints
 static/index.html  mic-record web UI
 src/
