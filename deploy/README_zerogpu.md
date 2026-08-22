@@ -9,7 +9,7 @@ python_version: "3.12.12"
 suggested_hardware: zero-a10g
 pinned: false
 license: mit
-short_description: Speak a Hindi question, get an answer grounded in MS MARCO-XI
+short_description: Ask in Hindi by voice; answers grounded in MS MARCO-XI
 ---
 
 # 🎙️ Voice RAG — Hindi · MS MARCO-XI

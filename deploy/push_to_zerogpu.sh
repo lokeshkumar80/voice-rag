@@ -32,6 +32,37 @@ echo "==> Target: https://huggingface.co/spaces/$REPO_ID"
   echo "   exceed the startup timeout." >&2
   exit 1; }
 
+# Validate the Space README's YAML locally first. HF validates it server-side
+# during upload -- i.e. AFTER creating the Space and staging 555MB -- so a
+# one-character overrun costs a full round trip. Cheap to check here.
+python - "$ROOT/deploy/README_zerogpu.md" <<'PY'
+import sys
+path = sys.argv[1]
+text = open(path, encoding="utf-8").read()
+if not text.startswith("---"):
+    sys.exit(f"!! {path} must start with a YAML frontmatter block.")
+front = text.split("---")[1]
+meta = {}
+for line in front.strip().splitlines():
+    if ":" in line:
+        k, v = line.split(":", 1)
+        meta[k.strip()] = v.strip().strip('"')
+
+problems = []
+LIMITS = {"short_description": 60, "title": 100}
+for key, cap in LIMITS.items():
+    if key in meta and len(meta[key]) > cap:
+        problems.append(f"{key} is {len(meta[key])} chars, limit {cap}")
+for required in ("title", "sdk", "app_file"):
+    if required not in meta:
+        problems.append(f"missing required key: {required}")
+if meta.get("sdk") != "gradio":
+    problems.append(f"sdk must be 'gradio' for ZeroGPU (got {meta.get('sdk')!r})")
+if problems:
+    sys.exit("!! Space README metadata invalid:\n   - " + "\n   - ".join(problems))
+print("==> Space README metadata OK")
+PY
+
 IDX_MB=$(du -sm "$ROOT/data/index" | cut -f1)
 echo "==> Index size: ${IDX_MB} MB (uploaded via LFS; large indexes take a while)"
 
