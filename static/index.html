@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Voice RAG · MSMARCO-XI</title>
+<style>
+  :root { --bg:#0e1116; --card:#171b22; --line:#262c36; --fg:#e6e9ef; --mut:#8b94a3; --acc:#5b9bff; --ok:#37d67a; --warn:#ffb020; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--fg); }
+  .wrap { max-width:760px; margin:0 auto; padding:28px 18px 60px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .sub { color:var(--mut); font-size:13px; margin-bottom:22px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px; margin-bottom:16px; }
+  button { border:0; border-radius:10px; padding:12px 18px; font-size:15px; font-weight:600; cursor:pointer; }
+  #rec { background:var(--acc); color:#04122e; }
+  #rec.recording { background:#ff5d5d; color:#fff; }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  input[type=text] { flex:1; min-width:220px; background:#0d1017; border:1px solid var(--line); color:var(--fg); border-radius:10px; padding:11px 13px; font-size:14px; }
+  .send { background:#22303f; color:var(--fg); }
+  .lbl { color:var(--mut); font-size:12px; text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px; }
+  .answer { font-size:17px; line-height:1.5; }
+  .badge { display:inline-block; font-size:11px; padding:3px 8px; border-radius:999px; margin-left:8px; }
+  .badge.ok { background:rgba(55,214,122,.15); color:var(--ok); }
+  .badge.warn { background:rgba(255,176,32,.15); color:var(--warn); }
+  .timing { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--mut); margin-top:10px; }
+  .timing b { color:var(--fg); }
+  .ctx { border-top:1px solid var(--line); padding-top:10px; margin-top:8px; font-size:13px; color:var(--mut); }
+  .ctx .item { padding:6px 0; }
+  .hint { color:var(--mut); font-size:12px; margin-top:8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎙️ Voice RAG <span style="color:var(--mut);font-weight:400">· MSMARCO-XI</span></h1>
+  <div class="sub">Speak or type a question → transcribe → retrieve → grounded answer.</div>
+
+  <div class="card">
+    <div class="row">
+      <button id="rec">● Hold to record</button>
+      <span id="status" class="hint">idle</span>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <input id="q" type="text" placeholder="…or type a question and press Enter" />
+      <button class="send" id="send">Ask</button>
+    </div>
+    <div class="hint">Mic needs HTTPS or localhost. Recorded audio is sent to the server as WebM.</div>
+  </div>
+
+  <div class="card" id="result" style="display:none">
+    <div class="lbl">Transcript</div>
+    <div id="transcript" class="answer" style="font-size:14px;color:var(--mut);margin-bottom:14px"></div>
+    <div class="lbl">Answer <span id="flags"></span></div>
+    <div id="answer" class="answer"></div>
+    <div class="timing" id="timing"></div>
+    <div class="ctx" id="ctx"></div>
+  </div>
+</div>
+
+<script>
+const statusEl = document.getElementById('status');
+const resultEl = document.getElementById('result');
+
+function render(data){
+  resultEl.style.display = 'block';
+  document.getElementById('transcript').textContent = data.transcript || '—';
+  document.getElementById('answer').textContent = data.answer || '—';
+  const flags = document.getElementById('flags');
+  flags.innerHTML = '';
+  if (data.abstained) flags.innerHTML = '<span class="badge warn">abstained · '+data.reason+'</span>';
+  else if (data.grounded) flags.innerHTML = '<span class="badge ok">grounded</span>';
+  const t = data.timing_ms;
+  document.getElementById('timing').innerHTML =
+    `<span>STT <b>${t.stt}ms</b></span>
+     <span>embed <b>${t.embed}ms</b></span>
+     <span>retrieve <b>${t.retrieve}ms</b></span>
+     <span>retrieval total <b>${t.retrieval_total}ms</b></span>
+     <span>generate <b>${t.generate}ms</b></span>
+     <span>end-to-end <b>${t.total}ms</b></span>`;
+  document.getElementById('ctx').innerHTML =
+    '<div class="lbl" style="margin-bottom:6px">Retrieved context</div>' +
+    (data.contexts||[]).map(c=>`<div class="item">[${c.score}] ${c.text}</div>`).join('');
+}
+
+async function askText(q){
+  statusEl.textContent = 'thinking…';
+  const r = await fetch('/ask_text', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({query:q})});
+  render(await r.json()); statusEl.textContent = 'idle';
+}
+document.getElementById('send').onclick = ()=>{ const v=document.getElementById('q').value.trim(); if(v) askText(v); };
+document.getElementById('q').addEventListener('keydown', e=>{ if(e.key==='Enter'){ const v=e.target.value.trim(); if(v) askText(v);} });
+
+// ---- mic recording ----
+let mediaRecorder, chunks=[];
+const recBtn = document.getElementById('rec');
+async function startRec(){
+  const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+  mediaRecorder = new MediaRecorder(stream);
+  chunks = [];
+  mediaRecorder.ondataavailable = e=> chunks.push(e.data);
+  mediaRecorder.onstop = async ()=>{
+    const blob = new Blob(chunks, {type:'audio/webm'});
+    const fd = new FormData(); fd.append('file', blob, 'audio.webm');
+    statusEl.textContent = 'transcribing…';
+    const r = await fetch('/ask', {method:'POST', body:fd});
+    render(await r.json()); statusEl.textContent = 'idle';
+    stream.getTracks().forEach(t=>t.stop());
+  };
+  mediaRecorder.start(); recBtn.classList.add('recording'); statusEl.textContent='recording…';
+}
+function stopRec(){ if(mediaRecorder && mediaRecorder.state!=='inactive'){ mediaRecorder.stop(); recBtn.classList.remove('recording'); } }
+recBtn.addEventListener('mousedown', startRec);
+recBtn.addEventListener('touchstart', e=>{e.preventDefault(); startRec();});
+recBtn.addEventListener('mouseup', stopRec);
+recBtn.addEventListener('mouseleave', stopRec);
+recBtn.addEventListener('touchend', e=>{e.preventDefault(); stopRec();});
+</script>
+</body>
+</html>

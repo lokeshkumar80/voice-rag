@@ -1,0 +1,17 @@
+# --- core RAG ---
+sentence-transformers>=3.0.0     # local embeddings + cross-encoder reranker
+faiss-cpu>=1.8.0                 # sub-millisecond vector search
+rank-bm25>=0.2.2                 # lexical (BM25) retrieval for hybrid search
+datasets>=2.19.0                 # streaming the MSMARCO-XI subset from HF
+numpy>=1.26.0
+
+# --- voice ---
+sarvamai>=0.1.0                  # Sarvam STT (speech-to-text)
+
+# --- harness / api ---
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9          # file uploads (audio) in FastAPI
+pydantic>=2.6.0
+tenacity>=8.2.0                  # retries with backoff for network stages
+python-dotenv>=1.0.0

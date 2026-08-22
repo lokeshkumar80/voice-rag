@@ -1,0 +1,29 @@
+# --- secrets: NEVER commit ---
+.env
+*.key
+
+# --- environments ---
+.venv/
+venv/
+env/
+
+# --- build artifacts: rebuild with `python ingest.py` ---
+data/
+*.faiss
+*.pkl
+
+# --- python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# --- editors / os ---
+.vscode/
+.idea/
+.DS_Store
+
+# --- local scratch ---
+*.log
+scratch/
