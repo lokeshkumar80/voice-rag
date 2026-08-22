@@ -11,6 +11,9 @@ numpy>=1.26.0
 # --- voice ---
 sarvamai>=0.1.0                  # Sarvam STT (speech-to-text)
 
+# --- ui ---
+gradio>=4.0                      # app_gradio.py; also the only SDK ZeroGPU supports
+
 # --- harness / api ---
 fastapi>=0.110.0
 uvicorn[standard]>=0.29.0

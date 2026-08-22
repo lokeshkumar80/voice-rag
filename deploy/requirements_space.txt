@@ -1,0 +1,22 @@
+# Requirements for the ZeroGPU Space. Deliberately slimmer than the repo's
+# requirements.txt: `datasets` is only needed by ingest.py (the Space ships a
+# prebuilt index) and fastapi/uvicorn are only for app.py, which the Space
+# doesn't run. Fewer packages = faster, less fragile builds.
+
+# ZeroGPU supports a SPECIFIC set of torch versions (2.8.0 / 2.9.1 / 2.10.0 /
+# 2.11.0 as of Aug 2026). Leaving this unpinned lets pip install whatever is
+# newest, which can land outside that window and silently break GPU allocation.
+torch==2.11.0
+
+sentence-transformers>=3.0.0     # BGE-M3 embeddings + cross-encoder reranker
+faiss-cpu>=1.8.0                 # vector search (index is prebuilt and shipped)
+bm25s>=0.2.0                     # lexical BM25; see requirements.txt on why not rank-bm25
+numpy>=1.26.0
+
+sarvamai>=0.1.0                  # Sarvam STT
+pydantic>=2.6.0                  # structured harness I/O
+tenacity>=8.2.0                  # retries on network stages
+python-dotenv>=1.0.0
+
+gradio>=4.0                      # ZeroGPU is Gradio-SDK-only
+spaces                           # provides @spaces.GPU; no-op off-Spaces

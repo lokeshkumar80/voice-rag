@@ -323,9 +323,25 @@ Free options that do work:
 | Google Cloud Run | 4GB CPU | Free tier | Needs billing enabled; CPU-only, so latency ≫ the GPU numbers above |
 
 **ZeroGPU is the best free path** — it gives a real GPU, so the published
-latency numbers roughly hold instead of needing a CPU caveat. The cost is
-rewriting the FastAPI front end as Gradio, which is less painful than it sounds:
-`gr.Audio(sources=["microphone"])` replaces the hand-rolled MediaRecorder JS.
+latency numbers roughly hold instead of needing a CPU caveat.
+
+That front end is **already written**: [`app_gradio.py`](app_gradio.py) runs the
+same pipeline, and `gr.Audio(sources=["microphone"])` replaced the hand-rolled
+MediaRecorder JS. The `@spaces.GPU` decorator degrades to a no-op off-Spaces, so
+the identical file runs locally with `python app_gradio.py`.
+
+```bash
+export HF_TOKEN=hf_xxx                       # a WRITE token
+./deploy/push_to_zerogpu.sh <your-username>
+```
+Then, in the Space UI (neither is scriptable): **Settings → Hardware → ZeroGPU**,
+and add `SARVAM_API_KEY` as a **secret**.
+
+Two gotchas worth knowing before you try: ZeroGPU only supports specific PyTorch
+versions (2.8.0–2.11.0 as of Aug 2026), so `deploy/requirements_space.txt` pins
+it — leave it unpinned and pip may install a version outside that window and
+break GPU allocation. And "good standing" means a verified email **and** an
+account older than 30 days.
 
 `deploy/` holds a portable Dockerfile (honours `$PORT`, so one image serves
 Cloud Run's 8080 and Spaces' 7860), plus scripts for both targets. The Cloud Run
@@ -345,8 +361,10 @@ scripts/
   fetch_dataset.py         cache the parquet locally (resumable, stall-safe)
   calibrate_guardrail.py   picks MIN_DENSE_SCORE from HARD negatives
   faithfulness.py          what the guardrails buy: guardrails on vs off
-app.py             FastAPI server + endpoints
-static/index.html  mic-record web UI
+app.py             FastAPI server + endpoints (/ask, /ask_text)
+app_gradio.py      Gradio UI -- the deployable demo (HF Spaces + ZeroGPU)
+static/index.html  mic-record web UI (used by app.py)
+deploy/            Dockerfile + push scripts (Cloud Run / Spaces / ZeroGPU)
 src/
   chunking.py      4 chunking strategies
   indexer.py       embeddings + FAISS + BM25 (+ save/load)
