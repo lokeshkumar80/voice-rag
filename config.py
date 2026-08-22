@@ -43,9 +43,60 @@ def data_files(prefer_local: bool = True) -> dict:
         out[split] = local if os.path.exists(local) else url
     return out
 
-# Which passage text to index. For an Indic demo use "Translated_passages"
-# (matches Sarvam Indic STT). For English use "English_passages".
-PASSAGE_FIELD = os.getenv("PASSAGE_FIELD", "Translated_passages")
+# There is no "en" language code -- English is not a separate file, it lives
+# INSIDE each language's parquet as English_passages / Eng_Query / Eng_Answer.
+#
+# USE_ENGLISH swaps all three together, which is the whole point of the flag:
+# setting PASSAGE_FIELD alone leaves Hindi *queries* pointed at English passages,
+# which silently tanks retrieval instead of failing. Passage, query and answer
+# fields must move as a set.
+USE_ENGLISH = os.getenv("USE_ENGLISH", "false").lower() == "true"
+
+PASSAGE_FIELD = os.getenv(
+    "PASSAGE_FIELD", "English_passages" if USE_ENGLISH else "Translated_passages")
+QUERY_FIELD = os.getenv("QUERY_FIELD", "Eng_Query" if USE_ENGLISH else "query")
+ANSWER_FIELD = os.getenv("ANSWER_FIELD", "Eng_Answer" if USE_ENGLISH else "Answer")
+
+
+def row_query(row: dict) -> str:
+    """The query text for the configured language path."""
+    return (row.get(QUERY_FIELD) or "").strip()
+
+
+def row_answer(row: dict) -> str:
+    """The gold answer for the configured language path."""
+    return (row.get(ANSWER_FIELD) or "").strip()
+
+
+def _check_language_consistency() -> None:
+    """Fail loudly on a half-applied USE_ENGLISH.
+
+    The derived defaults above only apply when the field is NOT explicitly set.
+    An .env pinning PASSAGE_FIELD=Translated_passages therefore wins over
+    USE_ENGLISH=true, leaving English queries pointed at Hindi passages -- which
+    does not error, it just quietly returns bad results. That silent-mismatch
+    failure is the exact thing this flag exists to prevent, so refuse to start.
+    """
+    if not USE_ENGLISH:
+        return
+    wrong = []
+    if "English" not in PASSAGE_FIELD:
+        wrong.append(f"PASSAGE_FIELD={PASSAGE_FIELD!r} (expected 'English_passages')")
+    if not QUERY_FIELD.startswith("Eng"):
+        wrong.append(f"QUERY_FIELD={QUERY_FIELD!r} (expected 'Eng_Query')")
+    if not ANSWER_FIELD.startswith("Eng"):
+        wrong.append(f"ANSWER_FIELD={ANSWER_FIELD!r} (expected 'Eng_Answer')")
+    if wrong:
+        raise SystemExit(
+            "USE_ENGLISH=true but these are still set to the Indic path:\n  - "
+            + "\n  - ".join(wrong)
+            + "\n\nThey are almost certainly pinned in .env, which takes precedence "
+              "over the USE_ENGLISH defaults. Unset them there (or set them to the "
+              "English values) so the passage, query and answer fields move together."
+        )
+
+
+_check_language_consistency()
 
 # ---------------------------------------------------------------------------
 # Embeddings + index
@@ -163,7 +214,9 @@ GENERATION_MODE = os.getenv("GENERATION_MODE", "extractive")
 SARVAM_API_KEY = os.getenv("SARVAM_API_KEY", "")
 SARVAM_STT_MODEL = os.getenv("SARVAM_STT_MODEL", "saaras:v3")
 SARVAM_CHAT_MODEL = os.getenv("SARVAM_CHAT_MODEL", "sarvam-m")
-SARVAM_LANG = os.getenv("SARVAM_LANG", "hi-IN")  # STT hint; "unknown" to auto-detect
+SARVAM_LANG = os.getenv("SARVAM_LANG", "en-IN" if USE_ENGLISH else "hi-IN")
+# STT language hint; "unknown" to auto-detect. Follows USE_ENGLISH so the
+# transcript language matches the indexed passage language.
 
 # ---------------------------------------------------------------------------
 # Harness

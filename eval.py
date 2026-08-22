@@ -100,7 +100,7 @@ def build_eval_set(rows: int, chunk_strategy: str) -> EvalSet:
         passages = row.get("passages") or {}
         texts = passages.get(config.PASSAGE_FIELD) or passages.get("English_passages") or []
         selected = passages.get("is_selected") or [0] * len(texts)
-        q = (row.get("query") or "").strip()
+        q = config.row_query(row)
         if not q or not texts:
             continue
 
@@ -123,7 +123,7 @@ def build_eval_set(rows: int, chunk_strategy: str) -> EvalSet:
         if gold_for_row:                          # only keep queries with a known gold
             queries.append(q)
             gold_ids.append(gold_for_row)
-            gold_answers.append((row.get("Answer") or "").strip())
+            gold_answers.append(config.row_answer(row))
 
     print(f"  corpus={len(chunks)} chunks, eval queries={len(queries)}")
     index = HybridIndex.build(chunks)

@@ -65,9 +65,13 @@ Two naming traps worth knowing:
 - The variable is **`LANG_CODE`**, not `LANG`. `LANG` is the system locale
   variable — setting it does nothing here and can break your shell's locale.
 - There is **no `en` language code.** English is not a separate file; it lives
-  *inside* each language's parquet as the `English_passages` field. For an
-  English corpus keep `LANG_CODE=hi` and set `PASSAGE_FIELD=English_passages`.
-  (`LANG_CODE=en` raises `KeyError` — it isn't in `config.LANG_FILE`.)
+  *inside* each language's parquet as `English_passages` / `Eng_Query` /
+  `Eng_Answer`. (`LANG_CODE=en` raises `KeyError` — it isn't in
+  `config.LANG_FILE`.) Use **`USE_ENGLISH=true`**, which swaps the passage,
+  query *and* answer fields together — changing only `PASSAGE_FIELD` leaves
+  Hindi queries pointed at English passages, which doesn't error, it just
+  quietly returns bad results. `config.py` refuses to start on a half-applied
+  switch, since values pinned in `.env` take precedence over the flag.
 
 ### 3. Build the index (streams a dataset subset, chunks, embeds)
 ```bash

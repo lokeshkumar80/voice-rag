@@ -48,7 +48,7 @@ def query_sets(n: int) -> tuple[list[str], list[str]]:
                       split=config.SPLIT, streaming=True)
     on, off = [], []
     for i, row in enumerate(ds):
-        q = (row.get("query") or "").strip()
+        q = config.row_query(row)
         if not q:
             continue
         if i < config.MAX_ROWS:
