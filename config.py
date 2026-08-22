@@ -97,6 +97,16 @@ CANDIDATES = int(os.getenv("CANDIDATES", "30")) # candidates pulled before reran
 # peaks here on 5 of 6 IR metrics. Dense carries this corpus (alpha=0.0 scores
 # MRR 0.323 vs 0.510 at 0.9); BM25 contributes a small but real lift on top.
 HYBRID_ALPHA = float(os.getenv("HYBRID_ALPHA", "0.9"))  # weight on dense vs BM25 (0..1)
+# How the two signals are combined.
+#   "minmax" -- normalize each score list to [0,1] over the candidate set, then
+#               weight by alpha. Simple, but the normalization is relative to
+#               whatever candidates showed up, so the top of each list is pinned
+#               at 1.0 regardless of absolute quality.
+#   "rrf"    -- Reciprocal Rank Fusion: combine RANKS, not scores
+#               (sum of 1/(k+rank)). Scale-free and the standard choice, because
+#               it cannot be skewed by one signal's score distribution.
+FUSION = os.getenv("FUSION", "minmax")          # minmax | rrf
+RRF_K = int(os.getenv("RRF_K", "60"))           # standard smoothing constant
 USE_RERANK = os.getenv("USE_RERANK", "false").lower() == "true"  # cross-encoder; off for 200ms path
 # bge-reranker-v2-m3 is the multilingual cross-encoder that pairs with BGE-M3.
 RERANK_MODEL = os.getenv("RERANK_MODEL", "BAAI/bge-reranker-v2-m3")

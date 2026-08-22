@@ -141,18 +141,29 @@ This is the honest version of the 200 ms discussion above. The hosted STT call a
 200 ms end-to-end; what *is* under 200 ms — and what the target sensibly applies to — is the
 query-time retrieval path, at 13.6 ms warm.
 
-### Retrieval quality — `python eval.py --rows 500 --answer-f1`
-248 queries that have a gold passage (`is_selected==1`) in the corpus.
+### Retrieval quality — `python eval.py --rows 2000 --answer-f1`
+**1,219** queries with a gold passage (`is_selected==1`), over a 21,657-chunk
+eval index. (`eval.py` builds its own labelled index, separate from the serving
+index — see Layout.)
 
 | config | R@1 | R@5 | Hit@5 | MRR@10 | nDCG@10 | Answer F1 |
 |---|---|---|---|---|---|---|
-| BM25 only | 0.171 | 0.515 | 0.544 | 0.337 | 0.401 | 0.171 |
-| Dense only | 0.297 | 0.782 | 0.810 | 0.526 | 0.609 | 0.234 |
-| Hybrid a=0.6 | 0.247 | 0.727 | 0.770 | 0.464 | 0.550 | 0.211 |
-| **Hybrid + rerank** | **0.391** | **0.843** | **0.871** | **0.606** | **0.673** | **0.242** |
+| BM25 only | 0.136 | 0.402 | 0.424 | 0.259 | 0.311 | 0.196 |
+| Dense only | 0.312 | 0.701 | 0.727 | 0.494 | 0.562 | 0.281 |
+| Hybrid a=0.6 | 0.212 | 0.612 | 0.641 | 0.400 | 0.478 | 0.240 |
+| **Hybrid + rerank** | **0.364** | **0.744** | **0.773** | **0.551** | **0.610** | **0.293** |
 
-(`sentence` chunking — the measured default. Note `Hybrid a=0.6` is the ablation
-grid's fixed point, not the tuned value; see the alpha sweep below.)
+`sentence` chunking — the measured default. `Hybrid a=0.6` is the ablation grid's
+fixed point, not the tuned value; see the alpha sweep below.
+
+#### These numbers are *lower* than the small-corpus run, on purpose
+An earlier 500-row eval (5,592 chunks, 248 queries) scored MRR@10 **0.606** and
+Hit@5 **0.871**. Quadrupling the haystack drops those to **0.551** and **0.773**.
+
+Nothing got worse — the earlier task was simply easier. Retrieval metrics are a
+property of the *corpus size as much as the retriever*, so a headline MRR quoted
+without its corpus size means very little. These are the more credible numbers,
+and they are the ones worth reporting.
 
 Read `R@1` with care: it divides by the number of gold *chunks*, so when a gold
 passage splits into several chunks it is capped well below 1.0 by construction.

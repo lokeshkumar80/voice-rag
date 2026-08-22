@@ -79,7 +79,21 @@ class Retriever:
         dense_map = {int(i): float(s) for i, s in zip(didx, dscores) if i >= 0}
         d_arr = np.array([dense_map.get(cid, 0.0) for cid in cand_ids], dtype="float32")
         b_arr = np.array([float(bm25_all[cid]) for cid in cand_ids], dtype="float32")
-        fused = alpha * _minmax(d_arr) + (1 - alpha) * _minmax(b_arr)
+        if config.FUSION == "rrf":
+            # Fuse RANKS, not scores. Min-max normalization is relative to the
+            # candidate set -- the best candidate is pinned at 1.0 however weak
+            # it actually is -- so a signal with a poor score distribution can
+            # still dominate. RRF is scale-free and immune to that.
+            k = config.RRF_K
+            d_order = np.argsort(-d_arr)
+            b_order = np.argsort(-b_arr)
+            d_rank = np.empty(len(cand_ids), dtype="float32")
+            b_rank = np.empty(len(cand_ids), dtype="float32")
+            d_rank[d_order] = np.arange(len(cand_ids))
+            b_rank[b_order] = np.arange(len(cand_ids))
+            fused = (alpha / (k + d_rank + 1)) + ((1 - alpha) / (k + b_rank + 1))
+        else:
+            fused = alpha * _minmax(d_arr) + (1 - alpha) * _minmax(b_arr)
 
         results = []
         for cid, f, ds, bs in zip(cand_ids, fused, d_arr, b_arr):
