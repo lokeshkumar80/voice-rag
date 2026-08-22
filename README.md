@@ -153,14 +153,39 @@ justifies hybrid here; a single hand-picked alpha would have proved nothing.
 - Show the guardrails firing: ask something off-topic and something unsafe; the
   system abstains instead of hallucinating.
 
-## Deploying the live link
-- **Hugging Face Spaces (Docker or Gradio):** simplest for this dataset. Commit the
-  repo, add `SARVAM_API_KEY`
-  as a Space secret, and either ship a prebuilt `data/index/` or run `ingest.py`
-  in the build step (keep `MAX_ROWS` modest so the build finishes).
-- **Render / Railway / Fly.io:** deploy the FastAPI app; set the env vars; build
-  the index at deploy time or bake it into the image.
-- Mic capture in the browser needs HTTPS (all the above provide it) or localhost.
+## Deploying (not currently deployed — this runs locally)
+
+**Read this before reaching for Spaces.** As of August 2026 Hugging Face
+[gates compute Spaces behind a paid plan](https://huggingface.co/docs/hub/en/spaces-overview):
+
+> Static Spaces are free for everyone. Gradio and Docker Spaces run on compute
+> and require a paid plan to create: PRO for personal accounts.
+
+Creating a Docker Space on a free account returns **HTTP 402**. Note what this
+does *and does not* mean: the gate is the **Space type**, not resource usage —
+so shrinking or quantizing the model does **not** get you a free Docker Space.
+
+Free options that do work:
+
+| Option | Compute | Cost | Catch |
+|---|---|---|---|
+| **Gradio + [ZeroGPU](https://huggingface.co/docs/hub/en/spaces-zerogpu)** | Real GPU (48GB) | Free, 2 Spaces | Gradio SDK only; 5 min/day GPU quota; account >30 days + verified email |
+| Static Space | None | Free | Showcase page only, no backend |
+| HF model/dataset repo | None | Free | Git-backed tracking, like GitHub |
+| Google Cloud Run | 4GB CPU | Free tier | Needs billing enabled; CPU-only, so latency ≫ the GPU numbers above |
+
+**ZeroGPU is the best free path** — it gives a real GPU, so the published
+latency numbers roughly hold instead of needing a CPU caveat. The cost is
+rewriting the FastAPI front end as Gradio, which is less painful than it sounds:
+`gr.Audio(sources=["microphone"])` replaces the hand-rolled MediaRecorder JS.
+
+`deploy/` holds a portable Dockerfile (honours `$PORT`, so one image serves
+Cloud Run's 8080 and Spaces' 7860), plus scripts for both targets. The Cloud Run
+script refuses to run if the HF/GCP identity doesn't match the target owner, so
+a demo can't land on the wrong account.
+
+- Mic capture in the browser needs HTTPS or localhost.
+- Never bake `SARVAM_API_KEY` into an image — pass it as a runtime secret.
 
 ## Layout
 ```
