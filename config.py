@@ -71,7 +71,15 @@ HNSW_EF_SEARCH = int(os.getenv("HNSW_EF_SEARCH", "128"))  # search breadth; reca
 # Chunking
 # ---------------------------------------------------------------------------
 # Strategy applied at ingest time. See src/chunking.py.
-CHUNK_STRATEGY = os.getenv("CHUNK_STRATEGY", "semantic")  # fixed | sentence | recursive | semantic
+# Measured, not assumed: `for s in fixed sentence recursive semantic; do
+#   python eval.py --rows 500 --chunk $s --answer-f1; done`
+# "semantic" -- the sophisticated-sounding option -- came LAST on every
+# denominator-free metric (MRR@10 0.578 vs 0.606, Hit@5 0.839 vs 0.871) while
+# also being ~10x slower to build, since it embeds every sentence. "sentence"
+# ties "fixed" on the headline metrics, wins nDCG@10, yields the smallest index
+# (5,592 chunks), and never cuts mid-sentence -- which matters because the
+# extractive generator returns whole sentences.
+CHUNK_STRATEGY = os.getenv("CHUNK_STRATEGY", "sentence")  # fixed | sentence | recursive | semantic
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "512"))          # target chars (fixed/recursive)
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "64"))     # char overlap
 SEMANTIC_THRESHOLD = float(os.getenv("SEMANTIC_THRESHOLD", "0.55"))  # cosine break point

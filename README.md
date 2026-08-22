@@ -91,16 +91,16 @@ context. `POST /ask` (audio) and `POST /ask_text` (JSON) are the raw endpoints.
 ---
 
 ## Measured results
-Hindi (`LANG_CODE=hi`), 500 validation rows -> 7,670 chunks, BGE-M3 on an RTX 4060.
+Hindi (`LANG_CODE=hi`), 500 validation rows -> 5,442 chunks, BGE-M3 on an RTX 4060.
 
 ### Latency — `python benchmark.py --n 200`
 | stage (ms) | P50 | P70 | P100 |
 |---|---|---|---|
-| embed | 9.71 | 10.02 | 47.32 |
-| retrieve | 5.68 | 6.74 | 44.58 |
-| **retrieval_total** | **15.34** | **16.57** | **90.74** |
+| embed | 9.71 | 10.07 | 41.90 |
+| retrieve | 4.32 | 5.08 | 41.90 |
+| **retrieval_total** | **14.00** | **15.04** | **83.80** |
 
-**Retrieval P100 = 90.74 ms vs the 200 ms target — PASS.**
+**Retrieval P100 = 83.80 ms vs the 200 ms target — PASS.**
 The benchmark warms up before timing; the first query pays model load and CUDA
 init (~10 s), and leaving that in the timed loop puts a one-off cold start into
 P100 and misrepresents steady-state.
@@ -127,14 +127,42 @@ query-time retrieval path, at 13.6 ms warm.
 
 | config | R@1 | R@5 | Hit@5 | MRR@10 | nDCG@10 | Answer F1 |
 |---|---|---|---|---|---|---|
-| BM25 only | 0.132 | 0.400 | 0.524 | 0.323 | 0.343 | 0.190 |
-| Dense only | 0.227 | 0.617 | 0.786 | 0.505 | 0.525 | 0.232 |
-| Hybrid a=0.6 | 0.197 | 0.601 | 0.786 | 0.464 | 0.486 | 0.214 |
-| **Hybrid + rerank** | **0.285** | **0.678** | **0.839** | **0.578** | **0.574** | **0.248** |
+| BM25 only | 0.171 | 0.515 | 0.544 | 0.337 | 0.401 | 0.171 |
+| Dense only | 0.297 | 0.782 | 0.810 | 0.526 | 0.609 | 0.234 |
+| Hybrid a=0.6 | 0.247 | 0.727 | 0.770 | 0.464 | 0.550 | 0.211 |
+| **Hybrid + rerank** | **0.391** | **0.843** | **0.871** | **0.606** | **0.673** | **0.242** |
+
+(`sentence` chunking — the measured default. Note `Hybrid a=0.6` is the ablation
+grid's fixed point, not the tuned value; see the alpha sweep below.)
 
 Read `R@1` with care: it divides by the number of gold *chunks*, so when a gold
 passage splits into several chunks it is capped well below 1.0 by construction.
 `Hit@5` and `MRR@10` are the fair cross-config comparisons.
+
+### Which chunking strategy? — `python eval.py --rows 500 --chunk <s> --answer-f1`
+All four strategies, same 248 gold-labelled queries, best config (hybrid + rerank):
+
+| strategy | chunks | R@5 | Hit@5 | MRR@10 | nDCG@10 |
+|---|---|---|---|---|---|
+| **sentence** | 5,592 | **0.843** | 0.871 | 0.606 | **0.673** |
+| fixed | 5,602 | 0.832 | 0.875 | **0.612** | 0.669 |
+| recursive | 5,958 | 0.827 | **0.879** | 0.604 | 0.663 |
+| semantic | 7,975 | 0.676 | 0.839 | 0.578 | 0.574 |
+
+**The sophisticated option loses.** `semantic` chunking — embed every sentence,
+split at topic boundaries — came last on every metric *and* costs ~10x more to
+build, since it runs the embedder over each sentence before indexing.
+
+Be careful reading `R@5` across strategies: it divides by the number of gold
+*chunks*, and `semantic` emits ~40% more chunks, which inflates its denominator.
+The denominator-free metrics are the fair comparison — and `semantic` is still
+last on both (Hit@5 0.839 vs 0.871, MRR@10 0.578 vs 0.606), so the conclusion
+holds. The honest margin is the smaller one, not the R@5 gap.
+
+The top three are within noise of each other on 248 queries. `sentence` is the
+default because it wins nDCG@10, produces the smallest index, and never cuts
+mid-sentence — which matters here because the extractive generator returns whole
+sentences.
 
 ### Why HYBRID_ALPHA is 0.9 — `python eval.py --rows 500 --sweep`
 | alpha | 0.0 | 0.4 | 0.6 | 0.8 | **0.9** | 1.0 |
