@@ -61,6 +61,18 @@ def check_retrieval(contexts: List[RetrievedChunk]) -> Tuple[bool, str]:
     """
     if not contexts:
         return False, "no_context"
+
+    # If the cross-encoder already ran, prefer its score: it does full
+    # query-document attention instead of comparing independent embeddings, and
+    # separates answerable from unanswerable ~6.5x more widely than cosine
+    # (gap 0.510 vs 0.079 at 103k chunks). Free here -- the work is already done.
+    rr = [c.rerank_score for c in contexts if c.rerank_score is not None]
+    if rr:
+        best = max(rr)
+        if best < config.MIN_RERANK_SCORE:
+            return False, f"off_topic_rerank_{best:.3f}"
+        return True, ""
+
     best = max(c.dense_score for c in contexts)
     if best < config.MIN_DENSE_SCORE:
         return False, f"off_topic_low_score_{best:.3f}"

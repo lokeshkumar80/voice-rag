@@ -117,6 +117,18 @@ RERANK_MODEL = os.getenv("RERANK_MODEL", "BAAI/bge-reranker-v2-m3")
 # negatives give you a number, not a guarantee. Re-derive with
 # scripts/calibrate_guardrail.py and always cross-check scripts/faithfulness.py.
 MIN_DENSE_SCORE = float(os.getenv("MIN_DENSE_SCORE", "0.58"))
+
+# When the cross-encoder has already run (USE_RERANK=true) its score is a far
+# better abstention signal than cosine and costs nothing extra -- the work is
+# already done. Measured at 103k chunks, 150+150 queries:
+#   bi-encoder cosine : answerable 0.669 vs unanswerable 0.590 (gap 0.079)
+#   cross-encoder     : answerable 0.860 vs unanswerable 0.350 (gap 0.510)
+# a 6.5x wider separation -> balanced accuracy 0.710 vs 0.813.
+# A cascade (cosine first, cross-encoder only when ambiguous) was tried and
+# rejected: the distributions overlap so heavily that 71% of queries land in the
+# ambiguous band, so it costs ~236ms to buy *less* accuracy than always running
+# the cross-encoder. There is no cheap version of this.
+MIN_RERANK_SCORE = float(os.getenv("MIN_RERANK_SCORE", "0.85"))
 MIN_TRANSCRIPT_CHARS = int(os.getenv("MIN_TRANSCRIPT_CHARS", "3"))
 # Grounding check: fraction of answer content words that must appear in context.
 MIN_GROUNDING_OVERLAP = float(os.getenv("MIN_GROUNDING_OVERLAP", "0.35"))

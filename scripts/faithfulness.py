@@ -60,10 +60,11 @@ def load_queries(n: int) -> tuple[list[str], list[str]]:
     return answerable, unanswerable
 
 
-def run_set(pipe: Pipeline, queries: list[str], guardrails: bool) -> dict:
+def run_set(pipe: Pipeline, queries: list[str], guardrails: bool,
+            use_rerank: bool = False) -> dict:
     answered = 0
     for q in queries:
-        r = pipe.run(text=q, guardrails_enabled=guardrails)
+        r = pipe.run(text=q, guardrails_enabled=guardrails, use_rerank=use_rerank)
         if not r.abstained:
             answered += 1
     n = len(queries) or 1
@@ -73,6 +74,9 @@ def run_set(pipe: Pipeline, queries: list[str], guardrails: bool) -> dict:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--n", type=int, default=150, help="queries per set")
+    ap.add_argument("--rerank", action="store_true",
+                    help="enable the cross-encoder, which also switches the "
+                         "abstention gate onto its score (see guardrails.py)")
     args = ap.parse_args()
 
     if not HybridIndex.exists():
@@ -81,13 +85,14 @@ def main():
     pipe.run(text="warmup")          # exclude cold start
 
     answerable, unanswerable = load_queries(args.n)
+    print(f"rerank                   : {args.rerank}")
     print(f"answerable (in-slice)    : {len(answerable)}")
     print(f"unanswerable (out-slice) : {len(unanswerable)}")
 
     rows = []
     for label, on in [("guardrails OFF", False), ("guardrails ON", True)]:
-        ans = run_set(pipe, answerable, on)
-        una = run_set(pipe, unanswerable, on)
+        ans = run_set(pipe, answerable, on, args.rerank)
+        una = run_set(pipe, unanswerable, on, args.rerank)
         rows.append((label, ans, una))
 
     print(f"\n{'':<16}{'answered (answerable)':>24}{'answered (unanswerable)':>26}")

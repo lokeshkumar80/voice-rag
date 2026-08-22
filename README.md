@@ -91,16 +91,35 @@ context. `POST /ask` (audio) and `POST /ask_text` (JSON) are the raw endpoints.
 ---
 
 ## Measured results
-Hindi (`LANG_CODE=hi`), 500 validation rows -> 5,442 chunks, BGE-M3 on an RTX 4060.
+Hindi (`LANG_CODE=hi`), 10,000 validation rows -> **103,068 chunks**, BGE-M3 on an RTX 4060.
 
 ### Latency — `python benchmark.py --n 200`
 | stage (ms) | P50 | P70 | P100 |
 |---|---|---|---|
-| embed | 9.71 | 10.07 | 41.90 |
-| retrieve | 4.32 | 5.08 | 41.90 |
-| **retrieval_total** | **14.00** | **15.04** | **83.80** |
+| embed | 9.49 | 9.73 | 40.23 |
+| retrieve | 2.06 | 2.33 | 14.68 |
+| **retrieval_total** | **11.54** | **11.86** | **53.57** |
 
-**Retrieval P100 = 83.80 ms vs the 200 ms target — PASS.**
+**Retrieval P100 = 53.57 ms vs the 200 ms target — PASS**, on a corpus 19x larger
+than the earlier 5,442-chunk build *and faster than it was* (P50 14.00 → 11.54 ms).
+
+#### Why it got faster while getting 19x bigger
+Scaling to 103k chunks first made it *much* slower — retrieval P50 91 ms, P100
+525 ms, **OVER budget**. Profiling split the blame cleanly:
+
+| component | 103k chunks |
+|---|---|
+| FAISS HNSW search | 0.57 ms |
+| `rank_bm25` `get_scores` | **63.75 ms** |
+
+BM25 was **99%** of retrieval time. `rank_bm25` is pure Python and degrades
+*superlinearly*: extrapolating linearly from the 5.4k-chunk corpus predicted
+17 ms, and the real cost was 63.75 ms — **3.7x worse than the extrapolation**.
+Swapping to `bm25s` (sparse-matrix backed) took the same query from 63.75 ms to
+**0.06 ms — 652x** — at 0.9983 rank correlation with the old implementation.
+
+The lesson is the one the whole project keeps re-learning: *extrapolate to form a
+hypothesis, then measure.* The linear estimate was confident and wrong.
 The benchmark warms up before timing; the first query pays model load and CUDA
 init (~10 s), and leaving that in the timed loop puts a one-off cold start into
 P100 and misrepresents steady-state.
@@ -167,14 +186,42 @@ sentences.
 ### What the guardrails buy — `python scripts/faithfulness.py --n 150`
 Same queries, run twice: `guardrails_enabled=True` vs `False`.
 
-| | answers *answerable* | answers *unanswerable* |
-|---|---|---|
-| guardrails OFF | 100.0% | 100.0% |
-| **guardrails ON** | **86.0%** | **20.0%** |
+At **103k chunks**, both gates:
 
-**Ungrounded answers on unanswerable queries: 100% → 20% — an 80% relative
-reduction — at a cost of 14 points of coverage.** Both halves matter: a guardrail
-that abstained on everything would post a perfect 0% hallucination rate.
+| gate | answers *answerable* | answers *unanswerable* | extra latency |
+|---|---|---|---|
+| guardrails OFF | 100.0% | 100.0% | — |
+| cosine (default, fast path) | 88.7% | 52.7% | 0 ms |
+| **cross-encoder** (`USE_RERANK=true`) | 76.7% | **14.7%** | ~332 ms |
+
+**Ungrounded answers: 100% → 52.7% on the fast path, → 14.7% (an 85% reduction)
+with the cross-encoder.** Both halves matter: a guardrail that abstained on
+everything would post a perfect 0% hallucination rate.
+
+#### Guardrails get *harder* as the corpus grows
+On the 5.4k-chunk corpus the cosine gate blocked **80%** of unanswerable queries.
+At 103k chunks the same threshold blocks **52.7%**. Nothing regressed — a larger
+corpus simply means any query, answerable or not, is likelier to find a plausible
+near-match. Gibberish that scored 0.427 at 5.4k scores 0.499 at 103k.
+
+**An abstention threshold is only valid for the corpus size it was tuned on.**
+That is invisible until you scale, which is the argument for scaling before
+believing a safety number.
+
+#### Why the cross-encoder, and why there is no cheap version
+| discriminator | answerable | unanswerable | gap | best bal. acc |
+|---|---|---|---|---|
+| bi-encoder cosine | 0.669 | 0.590 | 0.079 | 0.710 |
+| **cross-encoder** | 0.860 | 0.350 | **0.510** | **0.813** |
+
+The cross-encoder separates the two **6.5x more widely**, because it does full
+query-document attention instead of comparing independently-encoded vectors.
+When `USE_RERANK=true` its score is already computed, so the better gate is free.
+
+A cascade — cosine first, cross-encoder only for ambiguous cases — was built and
+**rejected on measurement**: the distributions overlap so heavily that 71% of
+queries land in the ambiguous band, costing ~236 ms to buy *less* accuracy
+(0.793) than simply always running the cross-encoder (0.813).
 
 The negative set is the part that makes this real. It is *not* hand-written
 nonsense; it is real MS MARCO queries from rows **after** the indexed slice —
@@ -183,15 +230,18 @@ natural, on-domain questions whose passages simply were never indexed.
 #### The mistake worth reading
 The abstention threshold was originally calibrated against gibberish
 ("asdf qwerty", "capital of Mars"). It scored **0.93 balanced accuracy** and
-looked finished. Measured against realistic negatives, that same threshold
-blocked only **26%** of them.
+looked finished. Measured against realistic negatives — real MS MARCO queries
+whose passages were never indexed — that same threshold blocked only **26%**.
 
-Gibberish maxes out at a **0.434** cosine here; real unanswerable queries reach
-**0.719**. Easy negatives sit so far from everything in embedding space that they
-validate almost any threshold. Recalibrating on hard negatives moved
-`MIN_DENSE_SCORE` 0.50 → 0.58 and took the block rate from 26% to 80%.
+Gibberish sat at a **0.434** cosine; real unanswerable queries reached **0.719**.
+Easy negatives sit so far from everything in embedding space that they validate
+almost any threshold. Recalibrating on hard negatives moved `MIN_DENSE_SCORE`
+0.50 → 0.58 and took the block rate from 26% to 80% (on the 5.4k corpus).
 
 Calibrating a safety mechanism on easy cases gives you a number, not a guarantee.
+`scripts/calibrate_guardrail.py` now draws its negatives from validation rows
+past `MAX_ROWS`, and prints the trivial-gibberish score purely as a reminder of
+how easy that old test was.
 
 ### Why HYBRID_ALPHA is 0.9 — `python eval.py --rows 500 --sweep`
 | alpha | 0.0 | 0.4 | 0.6 | 0.8 | **0.9** | 1.0 |
