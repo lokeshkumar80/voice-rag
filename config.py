@@ -93,10 +93,21 @@ MIN_CHUNK_CHARS = int(os.getenv("MIN_CHUNK_CHARS", "80"))
 # ---------------------------------------------------------------------------
 TOP_K = int(os.getenv("TOP_K", "5"))            # final chunks handed to generator
 CANDIDATES = int(os.getenv("CANDIDATES", "30")) # candidates pulled before rerank/fusion
-# 0.9 is the measured optimum, not a guess: `python eval.py --rows 500 --sweep`
-# peaks here on 5 of 6 IR metrics. Dense carries this corpus (alpha=0.0 scores
-# MRR 0.323 vs 0.510 at 0.9); BM25 contributes a small but real lift on top.
-HYBRID_ALPHA = float(os.getenv("HYBRID_ALPHA", "0.9"))  # weight on dense vs BM25 (0..1)
+# 1.0 = pure dense. This is a measured negative result, not an oversight.
+#
+# At 5,442 chunks BM25 added a small real lift and 0.9 was optimal. At 21,657
+# chunks BM25 weakens relatively (MRR@10 0.259 vs dense 0.494) and alpha=1.0 wins
+# on 5 of 6 metrics -- mixing in the weaker signal only costs accuracy.
+#
+# Before accepting that, we tested the obvious alternative explanation: that
+# min-max score fusion was the problem, not BM25. Reciprocal Rank Fusion (the
+# standard fix) helped mid-range (alpha=0.6: MRR 0.425 vs 0.401) but still peaked
+# at 1.0. So the fusion was mildly suboptimal AND BM25 genuinely does not help
+# here. Both signals were measured; dense carries this corpus.
+#
+# Keep the hybrid path: it is a config change away, and the answer is corpus
+# dependent -- it already flipped once between 5k and 21k chunks.
+HYBRID_ALPHA = float(os.getenv("HYBRID_ALPHA", "1.0"))  # weight on dense vs BM25 (0..1)
 # How the two signals are combined.
 #   "minmax" -- normalize each score list to [0,1] over the candidate set, then
 #               weight by alpha. Simple, but the normalization is relative to
@@ -105,7 +116,7 @@ HYBRID_ALPHA = float(os.getenv("HYBRID_ALPHA", "0.9"))  # weight on dense vs BM2
 #   "rrf"    -- Reciprocal Rank Fusion: combine RANKS, not scores
 #               (sum of 1/(k+rank)). Scale-free and the standard choice, because
 #               it cannot be skewed by one signal's score distribution.
-FUSION = os.getenv("FUSION", "minmax")          # minmax | rrf
+FUSION = os.getenv("FUSION", "rrf")             # minmax | rrf (rrf >= minmax measured)
 RRF_K = int(os.getenv("RRF_K", "60"))           # standard smoothing constant
 USE_RERANK = os.getenv("USE_RERANK", "false").lower() == "true"  # cross-encoder; off for 200ms path
 # bge-reranker-v2-m3 is the multilingual cross-encoder that pairs with BGE-M3.

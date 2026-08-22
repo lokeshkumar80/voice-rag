@@ -1,7 +1,13 @@
 # Voice-Enabled RAG · MSMARCO-XI
 
-Voice in → Sarvam STT → hybrid chunk retrieval (FAISS + BM25) → grounded answer,
-run inside a timed, guardrailed harness with P50/P70/P100 latency analytics.
+Voice in → Sarvam STT → chunk retrieval (FAISS HNSW dense + BM25, fusion
+configurable) → grounded answer, inside a timed, guardrailed harness with
+P50/P70/P100 latency analytics.
+
+Every default here is a measured result, not a convention — including the ones
+that came out against the obvious choice. Dense-only beats hybrid on this corpus,
+plain sentence splitting beats semantic chunking, and the abstention threshold
+that scored 0.93 on easy negatives was worth almost nothing on realistic ones.
 
 ```
 audio ─▶ STT ─▶ [input guardrail] ─▶ embed+retrieve ─▶ [off-topic guardrail]
@@ -254,20 +260,44 @@ Calibrating a safety mechanism on easy cases gives you a number, not a guarantee
 past `MAX_ROWS`, and prints the trivial-gibberish score purely as a reminder of
 how easy that old test was.
 
-### Why HYBRID_ALPHA is 0.9 — `python eval.py --rows 500 --sweep`
-| alpha | 0.0 | 0.4 | 0.6 | 0.8 | **0.9** | 1.0 |
-|---|---|---|---|---|---|---|
-| MRR@10 | 0.323 | 0.419 | 0.465 | 0.492 | **0.510** | 0.505 |
-| nDCG@10 | 0.343 | 0.442 | 0.488 | 0.512 | **0.529** | 0.526 |
+### Does hybrid retrieval actually help? — a measured *no*
+`python eval.py --rows 2000 --sweep` (1,219 queries, 21,657-chunk eval index)
 
-Dense carries this corpus. BM25 adds a small but real lift on top — the peak is
-at 0.9, not at the 0.6 that looks like a sensible default. The sweep is what
-justifies hybrid here; a single hand-picked alpha would have proved nothing.
+| alpha | 0.0 | 0.6 | 0.8 | 0.9 | **1.0** |
+|---|---|---|---|---|---|
+| MRR@10 (min-max fusion) | 0.259 | 0.401 | 0.458 | 0.485 | **0.496** |
+| MRR@10 (RRF fusion) | 0.259 | 0.425 | 0.464 | 0.483 | **0.495** |
+
+`alpha=1.0` is pure dense. **Adding BM25 at any weight makes retrieval worse**, so
+the default is dense-only — and BM25 stays wired in because the answer is
+corpus-dependent, not permanent.
+
+Two things worth noting, because the naive read of this table is wrong:
+
+**1. This flipped with scale.** On the 5,442-chunk corpus BM25 *did* add a real
+lift and `alpha=0.9` was optimal. At 21,657 chunks BM25 weakens relatively
+(MRR@10 0.259 vs dense 0.494) and mixing it in only costs accuracy. The tuned
+value from the small corpus was actively wrong at the larger one.
+
+**2. We tested the obvious alternative explanation before accepting it.** The
+suspicion was that *min-max fusion* was at fault rather than BM25 — it normalizes
+over the candidate set, pinning the best candidate at 1.0 however weak it is.
+(The exact same flaw made the original fused-score guardrail unable to fire, so
+it had form.) Reciprocal Rank Fusion, the standard remedy, combines ranks instead
+and is scale-free. It **did** help mid-range — alpha=0.6: 0.425 vs 0.401 — but
+still peaked at 1.0.
+
+So both are true: the fusion was mildly suboptimal (RRF is now the default), *and*
+BM25 genuinely does not help on this corpus. A negative result that survives its
+own best counter-argument is worth more than a positive one that was never tested.
 
 ## Experiments worth running
 - Compare chunking strategies: re-run `ingest.py` with `CHUNK_STRATEGY=fixed` vs
   `semantic`, benchmark each, and show retrieval-quality/latency trade-offs.
-- Sweep the fusion weight with `python eval.py --rows 500 --sweep` (see above).
+- Sweep the fusion weight with `python eval.py --rows 2000 --sweep`, and compare
+  fusion methods with `FUSION=rrf` vs `FUSION=minmax` (see above).
+- Re-run `scripts/faithfulness.py` after **any** corpus size change — abstention
+  thresholds do not survive scaling.
 - Show the guardrails firing: ask something off-topic and something unsafe; the
   system abstains instead of hallucinating.
 
