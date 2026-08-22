@@ -1,7 +1,9 @@
-# HF Spaces (Docker SDK) image for the voice-RAG demo.
-# Free Spaces are CPU-only, so we install the CPU torch wheel explicitly --
-# the default pip index serves the CUDA build (~2.5GB) which is dead weight here
-# and slow enough to time the build out.
+# Container image for the voice-RAG demo. Portable across Cloud Run and HF
+# Spaces: both inject a PORT (Cloud Run 8080, HF 7860) and the CMD honours it.
+#
+# Both targets are CPU-only, so we install the CPU torch wheel explicitly -- the
+# default pip index serves the CUDA build (~2.5GB), which is dead weight here and
+# slow enough to time the build out.
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
@@ -9,7 +11,7 @@ ENV PYTHONUNBUFFERED=1 \
     HF_HOME=/app/.cache/huggingface \
     DEVICE=cpu \
     INDEX_DIR=/app/data/index \
-    PORT=7860
+    PORT=8080
 
 WORKDIR /app
 
@@ -34,8 +36,10 @@ RUN python -c "from sentence_transformers import SentenceTransformer; \
 RUN useradd -m -u 1000 user && chown -R user:user /app
 USER user
 
-EXPOSE 7860
-HEALTHCHECK --interval=30s --timeout=5s --start-period=120s \
-    CMD curl -fsS http://localhost:7860/health || exit 1
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=180s \
+    CMD curl -fsS "http://localhost:${PORT}/health" || exit 1
 
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7860"]
+# Shell form on purpose: ${PORT} must expand at runtime so the same image runs
+# on Cloud Run (8080) and HF Spaces (7860) without a rebuild.
+CMD exec uvicorn app:app --host 0.0.0.0 --port ${PORT}

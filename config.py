@@ -22,11 +22,26 @@ LANG_FILE = {
     "sa": "san", "ta": "tam", "te": "tel", "ur": "urd",
 }
 
-def data_files() -> dict:
+# Where `scripts/fetch_dataset.py` parks a local copy of the parquet. Streaming
+# straight from hf:// re-downloads on every run and, with no read timeout, a
+# dropped connection hangs the process indefinitely (it sits in CLOSE-WAIT
+# forever). Ablations re-read the same split many times, so cache it once.
+DATA_CACHE_DIR = os.getenv("DATA_CACHE_DIR", "data/raw")
+
+
+def data_files(prefer_local: bool = True) -> dict:
+    """Parquet paths per split -- a local cached copy when present, else hf://."""
     prefix = LANG_FILE[LANG]
     base = f"hf://datasets/{DATASET_ID}"
-    return {"train": f"{base}/train/{prefix}train.parquet",
-            "validation": f"{base}/validation/{prefix}val.parquet"}
+    remote = {"train": f"{base}/train/{prefix}train.parquet",
+              "validation": f"{base}/validation/{prefix}val.parquet"}
+    if not prefer_local:
+        return remote
+    out = {}
+    for split, url in remote.items():
+        local = os.path.join(DATA_CACHE_DIR, os.path.basename(url))
+        out[split] = local if os.path.exists(local) else url
+    return out
 
 # Which passage text to index. For an Indic demo use "Translated_passages"
 # (matches Sarvam Indic STT). For English use "English_passages".
