@@ -12,9 +12,9 @@
 #
 # Then:  ./deploy/push_to_zerogpu.sh <your-hf-username> [space-name]
 #
-# AFTER the push, two manual steps in the Space UI (neither can be scripted):
-#   a) Settings -> Hardware -> select **ZeroGPU**
-#   b) Settings -> Variables and secrets -> add secret SARVAM_API_KEY
+# Hardware and the SARVAM_API_KEY secret are both set at creation time, so there
+# are no manual UI steps. Note the hardware CANNOT be set afterwards: creating a
+# Gradio Space on free cpu-basic returns 402, so there is no Space to switch.
 set -euo pipefail
 
 USER="${1:?usage: push_to_zerogpu.sh <hf-username> [space-name]}"
@@ -35,8 +35,14 @@ echo "==> Target: https://huggingface.co/spaces/$REPO_ID"
 IDX_MB=$(du -sm "$ROOT/data/index" | cut -f1)
 echo "==> Index size: ${IDX_MB} MB (uploaded via LFS; large indexes take a while)"
 
-echo "==> Creating Space (idempotent) ..."
-python - "$REPO_ID" <<'PY'
+# The Sarvam key is set as a Space secret at creation time (below), so the mic
+# path works on first boot. Read from .env, never hardcoded, never uploaded.
+SARVAM_KEY="$(grep -E '^SARVAM_API_KEY=' "$ROOT/.env" 2>/dev/null | cut -d= -f2- || true)"
+[ -n "$SARVAM_KEY" ] || echo "!! SARVAM_API_KEY not in .env -- mic path will fail until you add the secret manually."
+
+echo "==> Creating Space as ZeroGPU (idempotent) ..."
+SARVAM_KEY="$SARVAM_KEY" python - "$REPO_ID" <<'PY'
+import os
 import sys
 from huggingface_hub import HfApi
 repo_id = sys.argv[1]
@@ -47,9 +53,27 @@ if who.lower() != owner.lower():
     # Guard against publishing to someone else's account by accident.
     print(f"!! Token authenticates as '{who}' but target owner is '{owner}'.")
     sys.exit(1)
-api.create_repo(repo_id=repo_id, repo_type="space", space_sdk="gradio",
-                exist_ok=True)
-print(f"   ok: {repo_id}")
+
+# space_hardware MUST be set at creation. A Space cannot be created on
+# free cpu-basic at all (HTTP 402: Gradio/Docker Spaces need PRO) -- the
+# ZeroGPU exemption applies to the Space's hardware, so creating it first and
+# switching afterwards is impossible: there is no first step.
+secrets = []
+key = os.environ.get("SARVAM_KEY", "")
+if key:
+    secrets.append({"key": "SARVAM_API_KEY", "value": key,
+                    "description": "Sarvam STT + chat API key"})
+try:
+    api.create_repo(repo_id=repo_id, repo_type="space", space_sdk="gradio",
+                    space_hardware="zero-a10g",
+                    space_secrets=secrets or None, exist_ok=True)
+except Exception as e:
+    if "402" in str(e):
+        print("!! 402 even with ZeroGPU hardware requested. ZeroGPU needs an")
+        print("   account in good standing: verified email AND older than 30")
+        print("   days. Check https://huggingface.co/settings/account")
+    raise
+print(f"   ok: {repo_id} (hardware: zero-a10g)")
 PY
 
 echo "==> Staging ..."
@@ -76,11 +100,8 @@ cat <<MSG
 
 ==> Pushed: https://huggingface.co/spaces/$REPO_ID
 
-    TWO MANUAL STEPS REMAIN (the API cannot set these):
-      1. Settings -> Hardware        -> select ZeroGPU
-      2. Settings -> Variables and secrets -> new SECRET
-           SARVAM_API_KEY = <your key from .env>
-         Without it the mic path fails; the text box still works.
+    Hardware (ZeroGPU) and the SARVAM_API_KEY secret were set at creation.
+    Verify under Settings if the mic path misbehaves.
 
     The first build installs torch + downloads BGE-M3 (~2.3GB). Expect a wait.
     If GPU allocation misbehaves, check torch is still within ZeroGPU's
