@@ -208,12 +208,22 @@ MIN_GROUNDING_OVERLAP = float(os.getenv("MIN_GROUNDING_OVERLAP", "0.35"))
 # ---------------------------------------------------------------------------
 # Generation
 # ---------------------------------------------------------------------------
-# "extractive" = no LLM, returns grounded span (fast, always grounded).
-# "llm"        = Sarvam chat completion, grounded by retrieved context.
+# "extractive" = no LLM, returns the best grounded sentences (~30ms, always
+#                grounded by construction).
+# "llm"        = Sarvam chat completion, grounded by the retrieved context.
+#
+# extractive is the default on measurement, not preference. sarvam-105b answers
+# are genuinely better -- it synthesizes a definition instead of quoting a
+# sentence -- but latency was 21s / 40s / 79s across three calls (median 40s).
+# That is unusable interactively, against ~30ms for extractive. Revisit if a
+# faster hosted model appears; the code path works and is tested.
 GENERATION_MODE = os.getenv("GENERATION_MODE", "extractive")
 SARVAM_API_KEY = os.getenv("SARVAM_API_KEY", "")
 SARVAM_STT_MODEL = os.getenv("SARVAM_STT_MODEL", "saaras:v3")
-SARVAM_CHAT_MODEL = os.getenv("SARVAM_CHAT_MODEL", "sarvam-m")
+# "sarvam-m" was deprecated (API returns 400: use sarvam-105b or
+# sarvam-105b-conversations). Verified working 2026-08-22. Hosted model
+# names drift -- if llm mode starts failing, check this first.
+SARVAM_CHAT_MODEL = os.getenv("SARVAM_CHAT_MODEL", "sarvam-105b")
 SARVAM_LANG = os.getenv("SARVAM_LANG", "en-IN" if USE_ENGLISH else "hi-IN")
 # STT language hint; "unknown" to auto-detect. Follows USE_ENGLISH so the
 # transcript language matches the indexed passage language.

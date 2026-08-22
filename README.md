@@ -295,6 +295,34 @@ So both are true: the fusion was mildly suboptimal (RRF is now the default), *an
 BM25 genuinely does not help on this corpus. A negative result that survives its
 own best counter-argument is worth more than a positive one that was never tested.
 
+### Generation: why extractive, and a bug that hid for weeks
+`GENERATION_MODE=llm` routes through Sarvam chat. It works — and its answers are
+genuinely better, synthesizing a definition instead of quoting a sentence — but
+it is **not** the default:
+
+| mode | latency | quality |
+|---|---|---|
+| **extractive** (default) | ~30 ms | best grounded sentences, grounded by construction |
+| `llm` (sarvam-105b) | 21 s / 40 s / 79 s (median **40 s**) | better prose |
+
+40 seconds is unusable interactively, so extractive stays.
+
+Testing that path turned up two things worth repeating:
+
+**1. Graceful degradation hides breakage.** `sarvam-m` had been *deprecated* —
+the API returns 400 pointing at `sarvam-105b`. Nobody noticed, because
+`generate()` catches every exception and silently falls back to extractive. The
+feature was dead and the system looked fine. **Test fallback paths directly,
+bypassing the try/except**, or you are testing the fallback rather than the
+feature.
+
+**2. `STAGE_TIMEOUT_S` was declared and wired to nothing.** The harness
+advertised a 15 s stage timeout that no code applied — hence a 79 s call running
+to completion. A timeout you advertise but never enforce is worse than none: it
+buys false confidence. It is now passed on both Sarvam calls. And because
+tenacity was retrying *timeouts*, degrading took 3 × 15 s = 46 s; timeouts now
+fail fast, so fallback lands in 15 s as configured.
+
 ## Experiments worth running
 - Compare chunking strategies: re-run `ingest.py` with `CHUNK_STRATEGY=fixed` vs
   `semantic`, benchmark each, and show retrieval-quality/latency trade-offs.

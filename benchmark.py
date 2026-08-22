@@ -29,7 +29,7 @@ def sample_queries(n: int) -> List[str]:
                   split=config.SPLIT, streaming=True)   # eval.py uses split="validation"
     qs = []
     for row in ds:
-        q = config.row_query(row)
+        q = (row.get("query") or "").strip()
         if q:
             qs.append(q)
         if len(qs) >= n:

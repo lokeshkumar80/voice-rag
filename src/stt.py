@@ -65,10 +65,12 @@ def transcribe(audio: BinaryIO | bytes, filename: str = "audio.webm",
         codec = codec or codec_for(filename)
         if codec:
             kwargs["input_audio_codec"] = codec
+        # STAGE_TIMEOUT_S applies here too -- see the note in generator.py.
         resp = client.speech_to_text.transcribe(
             file=buf,
             model=config.SARVAM_STT_MODEL,
             language_code=config.SARVAM_LANG,
+            request_options={"timeout_in_seconds": int(config.STAGE_TIMEOUT_S)},
             **kwargs,
         )
         transcript = getattr(resp, "transcript", "") or ""
