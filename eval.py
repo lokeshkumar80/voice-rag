@@ -21,7 +21,6 @@ Run:
 """
 from __future__ import annotations
 import argparse
-import math
 from dataclasses import dataclass, field
 from typing import Dict, List, Set
 
@@ -30,49 +29,12 @@ import numpy as np
 import config
 from src.chunking import chunk_passage
 from src.indexer import HybridIndex, embed
+# Metrics live in src/metrics.py: pure functions, stdlib-only, so CI can unit-test
+# them without torch/faiss/datasets or a GPU. Imported here so there is one
+# implementation, not two.
+from src.metrics import hit_at_k, mrr_at_k, ndcg_at_k, recall_at_k, token_f1
 from src.retriever import Retriever
 from src.schemas import Chunk
-
-
-# --------------------------- metrics ---------------------------
-def recall_at_k(ranked_ids: List[int], gold: Set[int], k: int) -> float:
-    if not gold:
-        return 0.0
-    hit = len(set(ranked_ids[:k]) & gold)
-    return hit / len(gold)
-
-
-def hit_at_k(ranked_ids: List[int], gold: Set[int], k: int) -> float:
-    return 1.0 if set(ranked_ids[:k]) & gold else 0.0
-
-
-def mrr_at_k(ranked_ids: List[int], gold: Set[int], k: int = 10) -> float:
-    for rank, cid in enumerate(ranked_ids[:k], start=1):
-        if cid in gold:
-            return 1.0 / rank
-    return 0.0
-
-
-def ndcg_at_k(ranked_ids: List[int], gold: Set[int], k: int = 10) -> float:
-    dcg = sum(1.0 / math.log2(r + 1) for r, cid in enumerate(ranked_ids[:k], 1) if cid in gold)
-    idcg = sum(1.0 / math.log2(r + 1) for r in range(1, min(len(gold), k) + 1))
-    return dcg / idcg if idcg > 0 else 0.0
-
-
-def token_f1(pred: str, gold: str) -> float:
-    p = pred.lower().split()
-    g = gold.lower().split()
-    if not p or not g:
-        return 0.0
-    common: Dict[str, int] = {}
-    for w in p:
-        if w in g:
-            common[w] = common.get(w, 0) + 1
-    overlap = sum(min(common[w], g.count(w)) for w in common)
-    if overlap == 0:
-        return 0.0
-    prec, rec = overlap / len(p), overlap / len(g)
-    return 2 * prec * rec / (prec + rec)
 
 
 # --------------------------- eval set ---------------------------

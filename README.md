@@ -1,5 +1,6 @@
 # Voice-Enabled RAG · MSMARCO-XI
 
+[![tests](https://github.com/lokeshkumar80/voice-rag/actions/workflows/ci.yml/badge.svg)](https://github.com/lokeshkumar80/voice-rag/actions/workflows/ci.yml)
 [![Open in Spaces](https://huggingface.co/datasets/huggingface/badges/resolve/main/open-in-hf-spaces-md.svg)](https://huggingface.co/spaces/lokeshkumar79/voice-rag-hindi)
 [![ZeroGPU](https://img.shields.io/badge/hardware-ZeroGPU-orange)](https://huggingface.co/docs/hub/en/spaces-zerogpu)
 [![Retrieval P50](https://img.shields.io/badge/retrieval%20P50-11.4%20ms-brightgreen)](#latency--python-benchmarkpy---n-200)
@@ -489,6 +490,8 @@ config.py          all tunables
 ingest.py          dataset -> chunks -> index
 benchmark.py       P50/P70/P100 analytics
 eval.py            IR metrics vs gold labels (+ --sweep for the alpha grid)
+tests/             pytest suite -- no torch/GPU/network needed
+.github/workflows/ CI: installs pytest only, runs on push + PR
 scripts/
   fetch_dataset.py         cache the parquet locally (resumable, stall-safe)
   calibrate_guardrail.py   picks MIN_DENSE_SCORE from HARD negatives
@@ -504,6 +507,7 @@ src/
   stt.py           Sarvam STT (retries)
   generator.py     extractive + grounded-LLM generation
   guardrails.py    input safety, off-topic, grounding checks
+  metrics.py       recall/hit/MRR/nDCG/token-F1 -- stdlib only, unit-tested
   harness.py       staged orchestrator with per-stage timing
   schemas.py       Pydantic contracts
 ```
