@@ -206,14 +206,30 @@ if missing:
 print(f"   all {len(local)} files present on the Space")
 PY
 
+# Report live state rather than a fixed footer: on a redeploy the "first build
+# downloads 2.3GB" note is just noise, and what you actually want to know is
+# whether the Space came back up.
+echo
+echo "==> Pushed: https://huggingface.co/spaces/$REPO_ID"
+echo
+python - "$REPO_ID" <<'PY'
+import sys
+from huggingface_hub import HfApi
+repo_id = sys.argv[1]
+rt = HfApi().space_info(repo_id).runtime
+print(f"    stage: {rt.stage}   hardware: {rt.hardware}")
+if rt.hardware != "zero-a10g":
+    print("    !! hardware is not zero-a10g -- check Settings -> Hardware.")
+if "BUILD" in (rt.stage or ""):
+    print("    Rebuilding now. A first build installs torch and pulls BGE-M3")
+    print("    (~2.3GB) and takes a while; later ones are much quicker.")
+    print(f"    Watch: https://huggingface.co/spaces/{repo_id}?logs=build")
+elif rt.stage == "RUNNING":
+    print("    Live.")
+PY
 cat <<MSG
 
-==> Pushed: https://huggingface.co/spaces/$REPO_ID
-
-    Hardware (ZeroGPU) and the SARVAM_API_KEY secret were set at creation.
-    Verify under Settings if the mic path misbehaves.
-
-    The first build installs torch + downloads BGE-M3 (~2.3GB). Expect a wait.
-    If GPU allocation misbehaves, check torch is still within ZeroGPU's
-    supported range (see deploy/requirements_space.txt).
+    ZeroGPU free tier allows 5 min of GPU per DAY. That is roughly a few dozen
+    queries, not unlimited -- expect a quota error after heavy testing, and a
+    reset ~24h after first use.
 MSG
