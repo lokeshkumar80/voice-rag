@@ -14,6 +14,13 @@ short_description: Ask in Hindi by voice; answers grounded in MS MARCO-XI
 
 # 🎙️ Voice RAG — Hindi · MS MARCO-XI
 
+[![Source on GitHub](https://img.shields.io/badge/source-GitHub-181717?logo=github)](https://github.com/lokeshkumar80/voice-rag)
+[![Retrieval P50](https://img.shields.io/badge/retrieval%20P50-11.4%20ms-brightgreen)](https://github.com/lokeshkumar80/voice-rag#latency--python-benchmarkpy---n-200)
+[![MRR@10](https://img.shields.io/badge/MRR%4010-0.551-blue)](https://github.com/lokeshkumar80/voice-rag#retrieval-quality--python-evalpy---rows-2000---answer-f1)
+
+**Source, methodology and every ablation:
+[github.com/lokeshkumar80/voice-rag](https://github.com/lokeshkumar80/voice-rag)**
+
 Ask a question in Hindi by voice or text. The pipeline transcribes it (Sarvam
 STT), retrieves from a chunked MS MARCO-XI corpus (BGE-M3 dense + FAISS HNSW),
 and answers **only** from what it retrieved.
@@ -58,7 +65,13 @@ the obvious choice:
 | Fusion | dense-only **beat** hybrid BM25 at this corpus size |
 
 Full methodology, ablations and the reasoning behind each default are in the
-source repository.
+[source repository](https://github.com/lokeshkumar80/voice-rag) — including the
+results that went *against* the obvious choice, and the measurement mistakes
+caught along the way.
+
+> **Quota note:** the free ZeroGPU tier allows 5 minutes of GPU per day shared
+> across all visitors. If you see a quota error, that is the limit rather than a
+> broken Space; it resets ~24h after first use.
 
 > Requires a `SARVAM_API_KEY` Space secret for the voice path; the text box works
 > without it.

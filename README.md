@@ -1,5 +1,15 @@
 # Voice-Enabled RAG · MSMARCO-XI
 
+[![Open in Spaces](https://huggingface.co/datasets/huggingface/badges/resolve/main/open-in-hf-spaces-md.svg)](https://huggingface.co/spaces/lokeshkumar79/voice-rag-hindi)
+[![ZeroGPU](https://img.shields.io/badge/hardware-ZeroGPU-orange)](https://huggingface.co/docs/hub/en/spaces-zerogpu)
+[![Retrieval P50](https://img.shields.io/badge/retrieval%20P50-11.4%20ms-brightgreen)](#latency--python-benchmarkpy---n-200)
+[![MRR@10](https://img.shields.io/badge/MRR%4010-0.551-blue)](#retrieval-quality--python-evalpy---rows-2000---answer-f1)
+
+**▶ Live demo: [huggingface.co/spaces/lokeshkumar79/voice-rag-hindi](https://huggingface.co/spaces/lokeshkumar79/voice-rag-hindi)**
+— speak a Hindi question, or type one. Try asking something the corpus *can't*
+answer; it should refuse. Note the free ZeroGPU tier allows 5 minutes of GPU per
+day across all visitors, so the demo may report a quota error if it has been busy.
+
 Voice in → Sarvam STT → chunk retrieval (FAISS HNSW dense + BM25, fusion
 configurable) → grounded answer, inside a timed, guardrailed harness with
 P50/P70/P100 latency analytics.
