@@ -75,20 +75,45 @@ def _timing_rows(t) -> list[list]:
     ]
 
 
-@GPU(duration=90)
+# Only the retrieval half touches the GPU, so only it holds one. Speech-to-text
+# is a *network* call to Sarvam (1-2.5s): wrapping it in @spaces.GPU would pin an
+# accelerator for the entire round trip while it sits idle. On ZeroGPU that is
+# billed against a 5 min/day free quota, so it is the difference between roughly
+# 8 demo queries and a few hundred.
+#
+# `duration` is a declared ceiling, not a measurement. 90s for a ~1s function
+# both wastes quota headroom and worsens queue priority (HF prioritises shorter
+# declared durations), so it is sized to the real work plus margin.
+@GPU(duration=30)
+def _retrieve_and_answer(transcript: str, use_rerank: bool):
+    return _PIPE.run(text=transcript, use_rerank=use_rerank)
+
+
 def answer(audio_path: str | None, text: str, use_rerank: bool):
     """One turn of the pipeline. Audio wins if both are supplied."""
     if not audio_path and not (text or "").strip():
         return "", "Record a question or type one.", [], "", ""
 
     t0 = time.perf_counter()
+    stt_ms = 0.0
     if audio_path:
+        # Transcribe OUTSIDE the GPU scope -- no accelerator needed for an HTTP call.
+        from src import stt as stt_mod
         with open(audio_path, "rb") as f:
             data = f.read()
-        res = _PIPE.run(audio=data, audio_filename=os.path.basename(audio_path),
-                        use_rerank=use_rerank)
+        t_stt = time.perf_counter()
+        try:
+            transcript, _lang = stt_mod.transcribe(
+                data, filename=os.path.basename(audio_path))
+        except Exception as e:
+            return "", f"Speech-to-text failed: {e}", [], "`stt_error`", ""
+        stt_ms = (time.perf_counter() - t_stt) * 1000
     else:
-        res = _PIPE.run(text=text, use_rerank=use_rerank)
+        transcript = text
+
+    res = _retrieve_and_answer(transcript, use_rerank)
+    res.timing.stt_ms = stt_ms          # measured outside the GPU call
+    res.transcript = transcript
     wall = (time.perf_counter() - t0) * 1000
 
     status = res.reason or ("abstained" if res.abstained else "answered")
