@@ -129,6 +129,33 @@ rm -rf "$STAGE/deploy"                     # deploy scripts aren't part of the a
 # .gitattributes goes up in its own commit first. This is good practice -- LFS
 # rules should exist before the files they govern -- though note it was NOT the
 # cause of the dropped index; see the .gitignore removal below for that.
+# Remove any .gitignore already hosted on the Space. Not shipping ours is not
+# enough: huggingface_hub resolves the ignore rules in three steps -- explicit
+# gitignore_content, then a .gitignore among the committed files, and FINALLY
+# "the .gitignore file already hosted on the Hub". An earlier run put ours there,
+# carrying `*.faiss`, so the server kept ignoring the index even once we stopped
+# uploading the file. upload_folder takes no gitignore_content override, so the
+# hosted copy has to go.
+echo "==> Clearing any .gitignore hosted on the Space ..."
+python - "$REPO_ID" <<'PY'
+import sys
+from huggingface_hub import HfApi
+from huggingface_hub.errors import EntryNotFoundError
+repo_id = sys.argv[1]
+api = HfApi()
+try:
+    api.delete_file(path_in_repo=".gitignore", repo_id=repo_id, repo_type="space",
+                    commit_message="Remove .gitignore: it excludes the shipped index")
+    print("   removed hosted .gitignore")
+except EntryNotFoundError:
+    print("   none present (fine)")
+except Exception as e:
+    if "404" in str(e) or "not found" in str(e).lower():
+        print("   none present (fine)")
+    else:
+        raise
+PY
+
 echo "==> Uploading LFS rules first (must precede the files they govern) ..."
 python - "$REPO_ID" "$STAGE" <<'PY'
 import os
