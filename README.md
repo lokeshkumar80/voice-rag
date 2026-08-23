@@ -27,23 +27,32 @@ audio ─▶ STT ─▶ [input guardrail] ─▶ embed+retrieve ─▶ [off-topi
 ## How each task requirement is met
 | Requirement | Where |
 |---|---|
-| 1. Speech-to-text (Sarvam) | `src/stt.py` (Saaras v3, retries) |
-| 2. Vast chunking | `src/chunking.py` (fixed / sentence / recursive / semantic + overlap + metadata) |
-| 3. <200 ms latency | local embed + FAISS; retrieval budget measured separately from STT/LLM |
-| 4. P50/P70/P100 analytics | `benchmark.py` |
-| 5. Harness | `src/harness.py` (staged orchestration, retries, structured Pydantic I/O, graceful degradation) |
-| 6. Guardrails | `src/guardrails.py` (input safety, off-topic abstain, hallucination/grounding check); measured in `scripts/faithfulness.py` |
+| 1. Speech-to-text (Sarvam) | `src/stt.py` — Saaras v3, retries, per-extension codec, enforced timeout |
+| 2. Vast chunking | `src/chunking.py` — fixed / sentence / recursive / semantic, overlap, metadata. All four **benchmarked**; `sentence` won |
+| 3. <200 ms latency | **11.5 ms P50 / 53.6 ms P100** over 103k chunks. See the framing note below — it is the retrieval segment, not the STT hop |
+| 4. P50/P70/P100 analytics | `benchmark.py`, warmed up so cold start doesn't pollute P100 |
+| 5. Harness | `src/harness.py` — staged orchestration, Pydantic I/O, retries, enforced stage timeouts, graceful degradation |
+| 6. Guardrails | `src/guardrails.py` — input safety, off-topic abstain, grounding check. **Measured**, not asserted: `scripts/faithfulness.py` |
+| Live demo | [HF Space on ZeroGPU](https://huggingface.co/spaces/lokeshkumar79/voice-rag-hindi) (`app_gradio.py`, `deploy/`) |
 
 ## About the 200 ms target — read this
-The full voice path can't hit 200 ms: STT is a network call (~300 ms–1 s) and any
-hosted LLM adds hundreds of ms. So the budget is applied to the **query-time
-retrieval segment** — `embed + vector search + rerank` — which runs locally and
-stays well under 200 ms. The harness times every stage separately, and
-`benchmark.py` prints the retrieval P100 against the 200 ms line **and** the
-end-to-end numbers, so the write-up is transparent about exactly what is being
-measured. To keep the whole non-STT path fast, generation defaults to an
-**extractive** mode (best grounded sentence, no LLM). Flip `GENERATION_MODE=llm`
-for Sarvam-generated answers and report that latency separately.
+The full voice path cannot hit 200 ms, and the measurements say so plainly:
+
+| stage | measured |
+|---|---|
+| Sarvam STT (network round trip) | **1,100–2,600 ms** |
+| retrieval — embed + search | **11.5 ms** P50 |
+| generation (extractive) | ~30 ms |
+
+**The STT hop alone is roughly 100x the entire local retrieval segment.** So the
+budget is applied to the **query-time retrieval segment** — `embed + vector
+search + rerank` — which is local, and genuinely fast. The harness times every
+stage separately and `benchmark.py` reports retrieval P100 against the 200 ms
+line *and* the end-to-end total, so nothing hides behind a favourable average.
+
+Generation defaults to **extractive** (best grounded sentences, no LLM, ~30 ms).
+`GENERATION_MODE=llm` works but sarvam-105b measured a **40 s median** — see
+[Generation](#generation-why-extractive-and-a-bug-that-hid-for-weeks) below.
 
 ---
 
@@ -60,16 +69,31 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
-> First install pulls torch (for `sentence-transformers`); it's a few hundred MB.
+> First install pulls torch via `sentence-transformers` — on Linux that is the
+> **CUDA build, ~2.5 GB**. For a CPU-only box, install
+> `torch --index-url https://download.pytorch.org/whl/cpu` first (see
+> `deploy/Dockerfile`, which does exactly this).
 
 ### 2. Configure
 ```bash
 cp .env.example .env       # then paste your SARVAM_API_KEY into .env
 ```
 Key knobs live in `config.py` (or set as env vars):
-`LANG_CODE` (hi/te/ta/bn…), `PASSAGE_FIELD` (`Translated_passages` for Indic,
-`English_passages` for English), `MAX_ROWS`, `CHUNK_STRATEGY`, `USE_RERANK`,
-`GENERATION_MODE`, `HYBRID_ALPHA`, `MIN_CHUNK_CHARS`, `MIN_DENSE_SCORE`.
+`LANG_CODE` (hi/te/ta/bn…), `PASSAGE_FIELD`, `USE_ENGLISH`, `MAX_ROWS`,
+`CHUNK_STRATEGY`, `MIN_CHUNK_CHARS`, `HYBRID_ALPHA`, `FUSION`, `USE_RERANK`,
+`MIN_DENSE_SCORE`, `MIN_RERANK_SCORE`, `GENERATION_MODE`, `EMBED_MAX_SEQ`,
+`STAGE_TIMEOUT_S`.
+
+Current measured defaults (each justified in **Measured results**):
+
+| knob | value | why |
+|---|---|---|
+| `CHUNK_STRATEGY` | `sentence` | beat fixed/recursive/semantic |
+| `HYBRID_ALPHA` | `1.0` | dense-only; BM25 hurt at this corpus size |
+| `FUSION` | `rrf` | ≥ min-max at every alpha |
+| `MIN_DENSE_SCORE` | `0.58` | calibrated on hard negatives |
+| `USE_RERANK` | `false` | +332 ms breaks the budget; big accuracy/abstention win when on |
+| `GENERATION_MODE` | `extractive` | LLM mode measured a 40 s median |
 
 Two naming traps worth knowing:
 - The variable is **`LANG_CODE`**, not `LANG`. `LANG` is the system locale
@@ -83,13 +107,23 @@ Two naming traps worth knowing:
   quietly returns bad results. `config.py` refuses to start on a half-applied
   switch, since values pinned in `.env` take precedence over the flag.
 
-### 3. Build the index (streams a dataset subset, chunks, embeds)
+### 3. Cache the dataset, then build the index
 ```bash
+python scripts/fetch_dataset.py     # ~460 MB, resumable — do this first
 python ingest.py
 ```
-This streams `MAX_ROWS` rows of MSMARCO-XI (default 4000 → tens of thousands of
-chunks), applies the chunking strategy, embeds locally, and writes
-`data/index/`. Start small (`MAX_ROWS=1000`) to smoke-test, then scale up.
+**Fetch first.** Streaming straight from `hf://` on every run has no read
+timeout, so a dropped connection parks the process at 0% CPU indefinitely rather
+than failing — it cost us a stalled ablation and a stalled download before we
+cached it. `config.data_files()` prefers `data/raw/` automatically once present.
+
+`ingest.py` chunks `MAX_ROWS` rows, embeds locally and writes `data/index/`.
+Reference points on an RTX 4060:
+
+| `MAX_ROWS` | chunks | index size | embed time |
+|---|---|---|---|
+| 500 (smoke test) | ~5.4k | ~30 MB | ~1 min |
+| **10,000 (what's measured here)** | **103,068** | **555 MB** | **~25 min** |
 
 ### 4. Check the latency numbers
 ```bash
@@ -100,13 +134,30 @@ python benchmark.py --n 100 --with-generation
 Prints a P50/P70/P100/mean table per stage and a PASS/OVER verdict vs 200 ms.
 The numbers under **Measured results** below came from this.
 
-### 5. Run the app (live link + demo)
+### 5. Check retrieval quality and what the guardrails buy
 ```bash
-uvicorn app:app --host 0.0.0.0 --port 8000
+python eval.py --rows 2000 --answer-f1          # IR metrics vs gold labels
+python eval.py --rows 2000 --sweep              # fusion-weight sweep
+python eval.py --rows 2000 --chunk fixed        # one chunking strategy
+python scripts/faithfulness.py --n 150          # guardrails on vs off
+python scripts/calibrate_guardrail.py           # re-derive MIN_DENSE_SCORE
 ```
-Open http://localhost:8000 — hold the button to record a question, or type one.
-You'll see the transcript, grounded answer, per-stage timing, and the retrieved
-context. `POST /ask` (audio) and `POST /ask_text` (JSON) are the raw endpoints.
+⚠ **Re-run the last two after any corpus size change.** Abstention thresholds do
+not survive scaling — the same threshold blocked 80% of unanswerable queries at
+5.4k chunks and 52.7% at 103k. See [What the guardrails
+buy](#what-the-guardrails-buy--python-scriptsfaithfulnesspy---n-150).
+
+### 6. Run the app
+Two front ends over the same pipeline:
+
+```bash
+python app_gradio.py                            # Gradio UI — what's deployed
+uvicorn app:app --host 0.0.0.0 --port 8000      # FastAPI + raw endpoints
+```
+Both show transcript, grounded answer, per-stage timing and retrieved context.
+Gradio is the deployable one (ZeroGPU is Gradio-only) and its `@spaces.GPU`
+decorator is a no-op off-Spaces, so the same file runs locally. FastAPI exposes
+`POST /ask` (audio) and `POST /ask_text` (JSON) for scripting.
 
 ---
 
@@ -213,6 +264,14 @@ The top three are within noise of each other on 248 queries. `sentence` is the
 default because it wins nDCG@10, produces the smallest index, and never cuts
 mid-sentence — which matters here because the extractive generator returns whole
 sentences.
+
+⚠ **Caveat, and it matters given everything else on this page:** this ablation
+ran at 500 rows, while the quality and latency numbers above are at 2,000 and
+10,000. Three other tuned values flipped when the corpus grew, so the ranking of
+the top three could too. What is unlikely to flip is `semantic` losing — it
+trails on every metric at every scale tested, and costs ~10x more to build.
+Re-run `eval.py --rows 2000 --chunk <s>` before treating the top-three order as
+settled.
 
 ### What the guardrails buy — `python scripts/faithfulness.py --n 150`
 Same queries, run twice: `guardrails_enabled=True` vs `False`.
@@ -334,8 +393,8 @@ tenacity was retrying *timeouts*, degrading took 3 × 15 s = 46 s; timeouts now
 fail fast, so fallback lands in 15 s as configured.
 
 ## Experiments worth running
-- Compare chunking strategies: re-run `ingest.py` with `CHUNK_STRATEGY=fixed` vs
-  `semantic`, benchmark each, and show retrieval-quality/latency trade-offs.
+- Compare chunking strategies with `python eval.py --rows 2000 --chunk <s>`
+  (already done for all four — see above; `sentence` won).
 - Sweep the fusion weight with `python eval.py --rows 2000 --sweep`, and compare
   fusion methods with `FUSION=rrf` vs `FUSION=minmax` (see above).
 - Re-run `scripts/faithfulness.py` after **any** corpus size change — abstention
