@@ -22,12 +22,20 @@ Let the per-stage latency table stay visible in frame. The STT-vs-retrieval spli
 **Do not** record the API key, `.env`, or your browser's other tabs.
 
 ## How to record
-Either the live Space or a local run works — local is faster and does not spend
-quota:
+
+⚠ **Record on a GPU, not CPU.** `DEVICE=cpu` runs fine but puts ~400 ms embed
+latency on screen, contradicting the 11.5 ms P50 the README reports. A demo that
+disagrees with your own headline number is worse than no demo.
+
+Either the live Space or a local run works — local does not spend ZeroGPU quota:
 
 ```bash
-python app_gradio.py       # http://localhost:7860
+./scripts/wait_for_gpu.sh && python app_gradio.py    # http://localhost:7860
 ```
+
+`wait_for_gpu.sh` blocks until ~3 GB is free, since another job on this machine
+(or a stale process) will otherwise OOM the model load. Check what is holding it
+with `nvidia-smi --query-compute-apps=pid,used_memory --format=csv`.
 
 | OS | Tool |
 |---|---|
