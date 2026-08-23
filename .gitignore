@@ -24,6 +24,15 @@ __pycache__/
 .idea/
 .DS_Store
 
+# --- demo media: MUST stay tracked ---
+# Explicit, because a .gitignore rule silently dropped the 430MB index from a
+# Hugging Face upload once (huggingface_hub feeds .gitignore to the preupload
+# API). These negations mean a future broad rule like *.mp4 cannot quietly eat
+# the README demo. Verify with: git check-ignore -v assets/demo.gif
+!assets/*.gif
+!assets/*.mp4
+!assets/*.png
+
 # --- local scratch ---
 *.log
 scratch/
