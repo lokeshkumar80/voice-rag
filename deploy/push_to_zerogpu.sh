@@ -112,6 +112,7 @@ cd "$ROOT"
 git ls-files -z | xargs -0 -I{} cp --parents {} "$STAGE/"
 cp "$ROOT/deploy/README_zerogpu.md"      "$STAGE/README.md"        # HF reads frontmatter here
 cp "$ROOT/deploy/requirements_space.txt" "$STAGE/requirements.txt" # slimmer, torch pinned
+cp "$ROOT/deploy/gitattributes_space"    "$STAGE/.gitattributes"   # LFS: *.faiss is NOT an HF default
 mkdir -p "$STAGE/data/index"
 cp -r "$ROOT"/data/index/* "$STAGE/data/index/"
 rm -f "$STAGE/.env"                        # never ship the key
@@ -125,6 +126,33 @@ repo_id, folder = sys.argv[1], sys.argv[2]
 HfApi().upload_folder(repo_id=repo_id, repo_type="space", folder_path=folder,
                       commit_message="Deploy voice-RAG Gradio demo")
 print("   upload complete")
+PY
+
+# Verify every staged file actually landed. upload_folder dropped the 430MB
+# dense.faiss silently once (no LFS rule for *.faiss) -- it printed
+# "Found 31 files ... Committing 30/30" and exited 0, so the only symptom was a
+# Space that would not boot. Never trust the exit code alone.
+echo "==> Verifying upload ..."
+python - "$REPO_ID" "$STAGE" <<'PY'
+import os
+import sys
+from huggingface_hub import HfApi
+repo_id, stage = sys.argv[1], sys.argv[2]
+local = set()
+for root, _dirs, files in os.walk(stage):
+    for f in files:
+        local.add(os.path.relpath(os.path.join(root, f), stage))
+remote = set(HfApi().list_repo_files(repo_id, repo_type="space"))
+missing = sorted(local - remote)
+if missing:
+    print(f"!! {len(missing)} staged file(s) did NOT reach the Space:")
+    for m in missing:
+        size = os.path.getsize(os.path.join(stage, m)) / 1e6
+        print(f"   - {m}  ({size:.0f} MB)")
+    print("   The Space will not start. Check .gitattributes has an LFS rule")
+    print("   covering these extensions.")
+    sys.exit(1)
+print(f"   all {len(local)} files present on the Space")
 PY
 
 cat <<MSG
