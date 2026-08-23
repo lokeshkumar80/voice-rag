@@ -402,7 +402,12 @@ fail fast, so fallback lands in 15 s as configured.
 - Show the guardrails firing: ask something off-topic and something unsafe; the
   system abstains instead of hallucinating.
 
-## Deploying (not currently deployed — this runs locally)
+## Deploying — live on ZeroGPU
+**▶ [huggingface.co/spaces/lokeshkumar79/voice-rag-hindi](https://huggingface.co/spaces/lokeshkumar79/voice-rag-hindi)**
+· one command: `./deploy/push_to_zerogpu.sh <hf-username>`
+
+Getting there took five failed attempts, and the traps are undocumented enough
+to be worth writing down.
 
 **Read this before reaching for Spaces.** As of August 2026 Hugging Face
 [gates compute Spaces behind a paid plan](https://huggingface.co/docs/hub/en/spaces-overview):
@@ -425,6 +430,32 @@ Free options that do work:
 
 **ZeroGPU is the best free path** — it gives a real GPU, so the published
 latency numbers roughly hold instead of needing a CPU caveat.
+
+### Five things that broke, in order
+Each looked like a different problem and reported success while failing:
+
+1. **`create_repo` returns 402 even for ZeroGPU** — hardware must be passed *at
+   creation* (`space_hardware="zero-a10g"`). You cannot create a Gradio Space on
+   free cpu-basic and switch afterwards; there is no first step to take.
+2. **`short_description` > 60 chars** fails server-side *after* the Space is
+   created and the index staged. `push_to_zerogpu.sh` now validates the
+   frontmatter locally first.
+3. **The 430 MB `dense.faiss` was silently dropped** — `Found 31 files …
+   Committing 30/30`, exit code 0. The cause was **our own `.gitignore`**:
+   `huggingface_hub` feeds it to the preupload API, and it carries `*.faiss` to
+   keep build artifacts out of git. Correct for the repo, catastrophic for the
+   Space, where the index *is* the payload.
+4. **Removing it from the upload wasn't enough** — the resolution order ends
+   with "the `.gitignore` already hosted on the Hub", and an earlier run had
+   published one. It has to be deleted from the Space.
+5. **The demo burned its whole daily GPU quota in ~8 queries** — `@spaces.GPU`
+   wrapped the entire pipeline, so the Space held an accelerator through the
+   1–2.5 s *network* call to Sarvam. STT now runs outside the GPU scope, and
+   `duration` is 30 s rather than an over-declared 90 s.
+
+The through-line: **three of these exited 0 while failing.** The deploy script
+now verifies every staged file actually landed, because on this platform a green
+exit code is not evidence.
 
 That front end is **already written**: [`app_gradio.py`](app_gradio.py) runs the
 same pipeline, and `gr.Audio(sources=["microphone"])` replaced the hand-rolled
