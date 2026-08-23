@@ -116,13 +116,19 @@ cp "$ROOT/deploy/gitattributes_space"    "$STAGE/.gitattributes"   # LFS: *.fais
 mkdir -p "$STAGE/data/index"
 cp -r "$ROOT"/data/index/* "$STAGE/data/index/"
 rm -f "$STAGE/.env"                        # never ship the key
+
+# Drop the repo's .gitignore from the upload. THIS is what silently ate
+# dense.faiss (twice): huggingface_hub sends the .gitignore found among the
+# committed files to the preupload API, which returns shouldIgnore=true per
+# file -- and ours carries `*.faiss` and `data/` to keep build artifacts out of
+# GIT. Those rules are correct for the source repo and exactly wrong for the
+# Space, where the prebuilt index is the payload. It is not an LFS problem.
+rm -f "$STAGE/.gitignore"
 rm -rf "$STAGE/deploy"                     # deploy scripts aren't part of the app
 
-# .gitattributes goes up in its OWN commit, before everything else. LFS routing
-# is decided against the .gitattributes already in the repo, so a rule shipped in
-# the same commit as the file it governs applies too late -- dense.faiss was
-# dropped twice this way, the second time even though the *.faiss rule was in
-# that very commit. Land the rules first, then the files they cover.
+# .gitattributes goes up in its own commit first. This is good practice -- LFS
+# rules should exist before the files they govern -- though note it was NOT the
+# cause of the dropped index; see the .gitignore removal below for that.
 echo "==> Uploading LFS rules first (must precede the files they govern) ..."
 python - "$REPO_ID" "$STAGE" <<'PY'
 import os
