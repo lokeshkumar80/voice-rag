@@ -118,6 +118,24 @@ cp -r "$ROOT"/data/index/* "$STAGE/data/index/"
 rm -f "$STAGE/.env"                        # never ship the key
 rm -rf "$STAGE/deploy"                     # deploy scripts aren't part of the app
 
+# .gitattributes goes up in its OWN commit, before everything else. LFS routing
+# is decided against the .gitattributes already in the repo, so a rule shipped in
+# the same commit as the file it governs applies too late -- dense.faiss was
+# dropped twice this way, the second time even though the *.faiss rule was in
+# that very commit. Land the rules first, then the files they cover.
+echo "==> Uploading LFS rules first (must precede the files they govern) ..."
+python - "$REPO_ID" "$STAGE" <<'PY'
+import os
+import sys
+from huggingface_hub import HfApi
+repo_id, folder = sys.argv[1], sys.argv[2]
+api = HfApi()
+api.upload_file(path_or_fileobj=os.path.join(folder, ".gitattributes"),
+                path_in_repo=".gitattributes", repo_id=repo_id,
+                repo_type="space", commit_message="LFS rules (incl. *.faiss)")
+print("   .gitattributes committed")
+PY
+
 echo "==> Uploading ..."
 python - "$REPO_ID" "$STAGE" <<'PY'
 import sys
