@@ -507,3 +507,10 @@ src/
   harness.py       staged orchestrator with per-stage timing
   schemas.py       Pydantic contracts
 ```
+
+## License
+[MIT](LICENSE) © 2026 Lokesh Kumar.
+
+The MS MARCO-XI dataset is redistributed by
+[ai4bharat](https://huggingface.co/datasets/ai4bharat/MSMARCO-XI) under its own
+terms; this repository ships no dataset content, only code that streams it.
