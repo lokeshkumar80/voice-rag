@@ -46,7 +46,9 @@ Record the **browser window only**, not the full desktop — a 1920×1080 deskto
 capture scaled to 800px makes the text unreadable.
 
 ## Then
-1. Save or rename the clip to **`assets/demo.mp4`**
+1. Save the clip to **`assets/demo.webm`** (or `.mp4`/`.mov`/`.mkv` — the script
+   finds whichever exists). GNOME's recorder emits **WebM** whatever you name the
+   file, so keep the extension honest rather than renaming it to `.mp4`.
 2. Run:
    ```bash
    ./scripts/make_demo_gif.sh

@@ -13,7 +13,18 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-IN="${1:-$ROOT/assets/demo.mp4}"
+
+# Accept whatever the screen recorder produced. GNOME's built-in recorder emits
+# WebM regardless of what you name the file, so don't assume .mp4 -- an extension
+# that lies about the container is a small thing that wastes a real debugging
+# session later. ffmpeg sniffs content, so any of these work.
+default_input() {
+  for f in "$ROOT"/assets/demo.webm "$ROOT"/assets/demo.mp4 "$ROOT"/assets/demo.mov "$ROOT"/assets/demo.mkv; do
+    [ -f "$f" ] && { echo "$f"; return; }
+  done
+  echo "$ROOT/assets/demo.webm"     # for the error message below
+}
+IN="${1:-$(default_input)}"
 OUT="${2:-$ROOT/assets/demo.gif}"
 WIDTH="${WIDTH:-800}"
 FPS="${FPS:-12}"                 # 12 is plenty for a UI screencast; 24 doubles size
@@ -24,7 +35,8 @@ command -v ffmpeg >/dev/null || {
 
 [ -f "$IN" ] || {
   echo "!! No input at: $IN" >&2
-  echo "   Record a 20-30s clip and save it there -- see assets/README.md." >&2
+  echo "   Record a 20-30s clip as assets/demo.webm (or .mp4/.mov/.mkv)" >&2
+  echo "   -- see assets/README.md." >&2
   exit 1; }
 
 PALETTE="$(mktemp --suffix=.png)"

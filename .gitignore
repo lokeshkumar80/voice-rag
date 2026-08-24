@@ -31,6 +31,7 @@ __pycache__/
 # the README demo. Verify with: git check-ignore -v assets/demo.gif
 !assets/*.gif
 !assets/*.mp4
+!assets/*.webm
 !assets/*.png
 
 # --- local scratch ---
