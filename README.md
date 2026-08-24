@@ -11,14 +11,11 @@
 answer; it should refuse. Note the free ZeroGPU tier allows 5 minutes of GPU per
 day across all visitors, so the demo may report a quota error if it has been busy.
 
-<!-- TODO: record assets/demo.mp4, run ./scripts/make_demo_gif.sh, then delete
-     this comment and the "not recorded yet" line below. See assets/README.md.
-     Until demo.gif exists the image below renders as broken alt text. -->
-
 ![Voice RAG demo — a Hindi question answered, then an off-topic question refused](assets/demo.gif)
 
-> *(demo GIF not recorded yet — the live Space above is fully working in the
-> meantime; see [`assets/README.md`](assets/README.md))*
+> The GIF is a hedge: the live Space above shares a 5 min/day ZeroGPU quota
+> across all visitors, so it can report a quota error on a busy day. The recorded
+> demo always works. To re-record it, see [`assets/README.md`](assets/README.md).
 
 Voice in → Sarvam STT → chunk retrieval (FAISS HNSW dense + BM25, fusion
 configurable) → grounded answer, inside a timed, guardrailed harness with
