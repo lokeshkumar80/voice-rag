@@ -20,8 +20,11 @@ Voice-enabled Hindi RAG pipeline (Sarvam STT -> BGE-M3 dense retrieval over FAIS
 ```
 
 ## Homepage
+The **`.hf.space` origin**, not `huggingface.co/spaces/...`. The latter embeds
+the app in a cross-origin iframe where browsers refuse microphone access, so a
+visitor arriving from the repo card would find the mic broken.
 ```
-https://huggingface.co/spaces/lokeshkumar79/voice-rag-hindi
+https://lokeshkumar79-voice-rag-hindi.hf.space
 ```
 
 ## Topics

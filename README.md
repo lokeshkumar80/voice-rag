@@ -1,15 +1,24 @@
 # Voice-Enabled RAG · MSMARCO-XI
 
 [![tests](https://github.com/lokeshkumar80/voice-rag/actions/workflows/ci.yml/badge.svg)](https://github.com/lokeshkumar80/voice-rag/actions/workflows/ci.yml)
-[![Open in Spaces](https://huggingface.co/datasets/huggingface/badges/resolve/main/open-in-hf-spaces-md.svg)](https://huggingface.co/spaces/lokeshkumar79/voice-rag-hindi)
+[![Open in Spaces](https://huggingface.co/datasets/huggingface/badges/resolve/main/open-in-hf-spaces-md.svg)](https://lokeshkumar79-voice-rag-hindi.hf.space)
 [![ZeroGPU](https://img.shields.io/badge/hardware-ZeroGPU-orange)](https://huggingface.co/docs/hub/en/spaces-zerogpu)
 [![Retrieval P50](https://img.shields.io/badge/retrieval%20P50-11.4%20ms-brightgreen)](#latency--python-benchmarkpy---n-200)
 [![MRR@10](https://img.shields.io/badge/MRR%4010-0.551-blue)](#retrieval-quality--python-evalpy---rows-2000---answer-f1)
 
-**▶ Live demo: [huggingface.co/spaces/lokeshkumar79/voice-rag-hindi](https://huggingface.co/spaces/lokeshkumar79/voice-rag-hindi)**
+**▶ Live demo: [lokeshkumar79-voice-rag-hindi.hf.space](https://lokeshkumar79-voice-rag-hindi.hf.space)**
 — speak a Hindi question, or type one. Try asking something the corpus *can't*
-answer; it should refuse. Note the free ZeroGPU tier allows 5 minutes of GPU per
-day across all visitors, so the demo may report a quota error if it has been busy.
+answer; it should refuse.
+
+> **Use that link, not the Space page.** `huggingface.co/spaces/…` embeds the app
+> in a cross-origin iframe where browsers refuse microphone access — it reports
+> "no microphone found" even on a machine with a working mic. The `.hf.space`
+> origin serves the identical app without the iframe, and recording works. You
+> can also upload an audio clip instead of recording.
+> The [Space page](https://huggingface.co/spaces/lokeshkumar79/voice-rag-hindi) is still the place for the model card and community tab.
+>
+> The free ZeroGPU tier allows 5 minutes of GPU per day *shared across all
+> visitors*, so a quota error means the limit, not a fault.
 
 ![Voice RAG demo — a Hindi question answered, then an off-topic question refused](assets/demo.gif)
 
@@ -40,7 +49,7 @@ audio ─▶ STT ─▶ [input guardrail] ─▶ embed+retrieve ─▶ [off-topi
 | 4. P50/P70/P100 analytics | `benchmark.py`, warmed up so cold start doesn't pollute P100 |
 | 5. Harness | `src/harness.py` — staged orchestration, Pydantic I/O, retries, enforced stage timeouts, graceful degradation |
 | 6. Guardrails | `src/guardrails.py` — input safety, off-topic abstain, grounding check. **Measured**, not asserted: `scripts/faithfulness.py` |
-| Live demo | [HF Space on ZeroGPU](https://huggingface.co/spaces/lokeshkumar79/voice-rag-hindi) (`app_gradio.py`, `deploy/`) |
+| Live demo | [Run it](https://lokeshkumar79-voice-rag-hindi.hf.space) · [Space page](https://huggingface.co/spaces/lokeshkumar79/voice-rag-hindi) (`app_gradio.py`, `deploy/`) |
 
 ## About the 200 ms target — read this
 The full voice path cannot hit 200 ms, and the measurements say so plainly:
@@ -410,7 +419,7 @@ fail fast, so fallback lands in 15 s as configured.
   system abstains instead of hallucinating.
 
 ## Deploying — live on ZeroGPU
-**▶ [huggingface.co/spaces/lokeshkumar79/voice-rag-hindi](https://huggingface.co/spaces/lokeshkumar79/voice-rag-hindi)**
+**▶ Run it: [lokeshkumar79-voice-rag-hindi.hf.space](https://lokeshkumar79-voice-rag-hindi.hf.space)** · [Space page](https://huggingface.co/spaces/lokeshkumar79/voice-rag-hindi)
 · one command: `./deploy/push_to_zerogpu.sh <hf-username>`
 
 Getting there took five failed attempts, and the traps are undocumented enough

@@ -19,7 +19,7 @@ gh auth status >/dev/null 2>&1 || {
 echo "==> Updating $REPO ..."
 gh repo edit "$REPO" \
   --description "Voice-enabled Hindi RAG pipeline (Sarvam STT -> BGE-M3 dense retrieval over FAISS-HNSW -> grounded answers) with measured ablations, guardrails, and sub-200ms retrieval. Deployed on HF ZeroGPU." \
-  --homepage "https://huggingface.co/spaces/lokeshkumar79/voice-rag-hindi" \
+  --homepage "https://lokeshkumar79-voice-rag-hindi.hf.space" \
   --add-topic rag \
   --add-topic retrieval \
   --add-topic information-retrieval \

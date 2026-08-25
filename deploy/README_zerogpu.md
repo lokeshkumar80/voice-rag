@@ -30,6 +30,14 @@ audio ─▶ STT ─▶ [input guardrail] ─▶ embed + retrieve ─▶ [off-to
       ─▶ generate ─▶ [grounding check] ─▶ answer      (+ per-stage timing)
 ```
 
+> ### 🎙️ Microphone not working?
+> You are viewing this app **inside Hugging Face's iframe**, where browsers
+> refuse microphone access — it reports "no microphone found" even on a machine
+> with a working mic. Open it on its own origin and recording works:
+> **[lokeshkumar79-voice-rag-hindi.hf.space](https://lokeshkumar79-voice-rag-hindi.hf.space)**
+>
+> Or upload an audio clip instead of recording — the pipeline is identical.
+
 ## Try making it refuse
 Ask something the corpus can't answer — *"What is the capital of Mars?"*, or
 gibberish. It should **abstain** rather than invent an answer. That behaviour is
