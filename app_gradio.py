@@ -141,7 +141,15 @@ with gr.Blocks(title="Voice RAG · Hindi · MSMARCO-XI") as demo:
     )
     with gr.Row():
         with gr.Column(scale=1):
-            mic = gr.Audio(sources=["microphone"], type="filepath", label="Speak (Hindi)")
+            # "upload" alongside "microphone" on purpose. HF Spaces embed this
+            # app in a cross-origin iframe, and browsers are unreliable about
+            # granting getUserMedia there -- the component reports "no
+            # microphone found" even though the iframe carries allow="microphone"
+            # and the device has one. Opening the app on its own origin fixes
+            # recording; the upload path means the voice pipeline is still
+            # demonstrable when it does not.
+            mic = gr.Audio(sources=["microphone", "upload"], type="filepath",
+                           label="Speak in Hindi — or upload an audio clip")
             txt = gr.Textbox(label="…or type", placeholder="कॉर्पोरेशन क्या है?", lines=2)
             rr = gr.Checkbox(
                 value=False,
@@ -153,6 +161,15 @@ with gr.Blocks(title="Voice RAG · Hindi · MSMARCO-XI") as demo:
                           ["What is the capital of Mars?"], ["asdf qwerty zxcv"]],
                 inputs=txt,
                 label="Try these — the last two should make it abstain",
+            )
+            gr.Markdown(
+                "🎙️ **Mic says “no microphone found”?** You are seeing this app "
+                "inside Hugging Face's iframe, where browsers often refuse "
+                "microphone access. Open it on its own origin and recording "
+                "works: **[lokeshkumar79-voice-rag-hindi.hf.space]"
+                "(https://lokeshkumar79-voice-rag-hindi.hf.space)** — or just "
+                "upload an audio clip above.",
+                elem_id="mic-help",
             )
         with gr.Column(scale=1):
             out_tr = gr.Textbox(label="Transcript", interactive=False)

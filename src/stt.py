@@ -11,7 +11,8 @@ import io
 import os
 from typing import BinaryIO, Optional, Tuple
 
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import (retry, retry_if_exception, stop_after_attempt,
+                      wait_exponential)
 
 import config
 
@@ -44,10 +45,23 @@ def _client():
     return SarvamAI(api_subscription_key=config.SARVAM_API_KEY)
 
 
+def _is_retryable(exc: BaseException) -> bool:
+    """Retry transient failures, not timeouts.
+
+    A timeout means the service is slow or unreachable, and it will still be on
+    attempt three -- retrying only multiplies the wait. Measured against an
+    unreachable endpoint: STAGE_TIMEOUT_S=15 with 3 attempts took 46s to fail,
+    which is indistinguishable from a hang to anyone using the app. Connection
+    resets and 5xx are worth another go; timeouts should surface immediately.
+    (generator.py applies the same rule to the chat call.)
+    """
+    return isinstance(exc, STTError) and not getattr(exc, "is_timeout", False)
+
+
 @retry(reraise=True,
        stop=stop_after_attempt(config.STAGE_RETRIES + 1),
        wait=wait_exponential(multiplier=0.3, max=3),
-       retry=retry_if_exception_type(STTError))
+       retry=retry_if_exception(_is_retryable))
 def transcribe(audio: BinaryIO | bytes, filename: str = "audio.webm",
                codec: Optional[str] = None) -> Tuple[str, str]:
     """Return (transcript, detected_language_code).
@@ -79,4 +93,10 @@ def transcribe(audio: BinaryIO | bytes, filename: str = "audio.webm",
     except STTError:
         raise
     except Exception as e:               # network / SDK errors -> retryable
-        raise STTError(f"Sarvam STT failed: {e}") from e
+        # Mark timeouts so the retry predicate can skip them. Everything here is
+        # wrapped as STTError, which erases the original type, so the flag has to
+        # be carried explicitly.
+        err = STTError(f"Sarvam STT failed: {e}")
+        name = type(e).__name__.lower()
+        err.is_timeout = "timeout" in name or "deadline" in name
+        raise err from e
