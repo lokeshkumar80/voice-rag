@@ -1,0 +1,70 @@
+<style>
+/* ---------- print / PDF ---------- */
+@page{ size:A4; margin:17mm 15mm 19mm; }
+@media print{
+  /* Force the light palette: a PDF is printed on paper regardless of the
+     rendering machine's OS theme, and headless Chrome can otherwise inherit
+     dark and produce an unreadable, ink-heavy document. */
+  :root,:root[data-theme="dark"],:root:not([data-theme="light"]){
+    --ground:#FFFFFF; --surface:#FFFFFF; --surface-2:#F3F5F8;
+    --text:#12181F; --text-2:#3D4854; --text-3:#5E6975;
+    --rule:#C9D2DB; --rule-strong:#A9B4C0;
+    --accent:#0C4F4C; --accent-soft:#E4F0EF;
+    --copper:#7A4718; --copper-soft:#F8EFE3;
+    --crimson:#7C2B2D; --crimson-soft:#F9E8E8;
+    --code-bg:#F3F5F8;
+  }
+  html,body{background:#fff!important}
+  body{font-size:10.4pt;line-height:1.55}
+  .wrap{max-width:none;padding:0}
+  .rail{display:none!important}                 /* sticky nav is meaningless on paper */
+  .body-grid{grid-template-columns:1fr!important;gap:0!important}
+  :root{--measure:none}
+  p,ul,ol,.find,.overturn,.note{max-width:none}
+
+  .mast{padding:0 0 14pt;border-bottom:1.2pt solid var(--rule)}
+  h1{font-size:26pt;margin-bottom:10pt}
+  .standfirst{font-size:12pt;max-width:none;margin-bottom:14pt}
+  section{padding:16pt 0 14pt}
+  h2{font-size:16pt;margin-bottom:4pt}
+  h3{font-size:12pt;margin:16pt 0 6pt}
+  h4{margin:14pt 0 5pt}
+
+  /* Keep structural units intact across page boundaries. A table split from
+     its caption, or a finding split from its label, loses its meaning. */
+  h1,h2,h3,h4{break-after:avoid-page;page-break-after:avoid}
+  .tbl-wrap,.find,.overturn,.note,.stats,.flow,pre,table{
+    break-inside:avoid;page-break-inside:avoid
+  }
+  tr,li{break-inside:avoid;page-break-inside:avoid}
+  #abstract,#results,#resume{break-before:page;page-break-before:always}
+
+  table{font-size:9pt}
+  th,td{padding:5pt 8pt}
+  caption{padding:6pt 8pt;font-size:8.5pt}
+  .stat .v{font-size:15pt}
+  pre code{font-size:8.6pt}
+  code{font-size:.86em}
+  a{color:var(--accent);text-decoration:none;font-weight:500}
+  .foot{padding:14pt 0 0;border-top:1pt solid var(--rule)}
+
+  /* The nav rail is hidden on paper, so the PDF would otherwise ship with no
+     way to navigate 23 pages. This print-only contents block replaces it. */
+  .print-toc{display:block!important}
+}
+.print-toc{display:none}
+.print-toc h2{
+  font-family:"IBM Plex Mono",monospace;font-size:10.5pt;font-weight:600;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--text-3);
+  margin:0 0 12pt;display:block
+}
+.print-toc ol{list-style:none;padding:0;margin:0;column-count:2;column-gap:26pt}
+.print-toc li{
+  margin:0 0 7pt;font-size:10pt;color:var(--text-2);
+  break-inside:avoid;display:flex;gap:9pt
+}
+.print-toc li b{
+  font-family:"IBM Plex Mono",monospace;font-weight:500;color:var(--accent);
+  flex:none;min-width:2.1em
+}
+</style>

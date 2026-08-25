@@ -498,8 +498,13 @@ benchmark.py       P50/P70/P100 analytics
 eval.py            IR metrics vs gold labels (+ --sweep for the alpha grid)
 tests/             pytest suite -- no torch/GPU/network needed
 .github/workflows/ CI: installs pytest only, runs on push + PR
+docs/
+  report.html              full engineering report (source for the PDF)
+  Voice-RAG-Field-Report.pdf   23-page report, regenerate with make_report_pdf.sh
+  RESUME.md                copy-paste bullets + interview notes
 scripts/
   fetch_dataset.py         cache the parquet locally (resumable, stall-safe)
+  make_report_pdf.sh       report.html -> PDF (contents page auto-built)
   calibrate_guardrail.py   picks MIN_DENSE_SCORE from HARD negatives
   faithfulness.py          what the guardrails buy: guardrails on vs off
 app.py             FastAPI server + endpoints (/ask, /ask_text)

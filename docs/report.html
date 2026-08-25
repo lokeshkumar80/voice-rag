@@ -1,0 +1,871 @@
+<title>Voice RAG Field Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;0,700;1,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+:root{
+  --ground:#F2F4F6; --surface:#FFFFFF; --surface-2:#E9EDF1;
+  --text:#141A21; --text-2:#4A5563; --text-3:#6B7684;
+  --rule:#D3DAE2; --rule-strong:#B4BEC9;
+  --accent:#0F5F5B; --accent-soft:#DCEDEB;
+  --copper:#8A5320; --copper-soft:#F6EADC;
+  --crimson:#8C3234; --crimson-soft:#F7E4E4;
+  --code-bg:#EDF1F4;
+  --measure:68ch;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0C1116; --surface:#131A21; --surface-2:#1B242D;
+    --text:#E4EAF0; --text-2:#A3B0BD; --text-3:#7C8996;
+    --rule:#26313B; --rule-strong:#3A4854;
+    --accent:#4FBFB4; --accent-soft:#122E2C;
+    --copper:#D69A5C; --copper-soft:#2C2015;
+    --crimson:#E08585; --crimson-soft:#2E1919;
+    --code-bg:#0F161C;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0C1116; --surface:#131A21; --surface-2:#1B242D;
+  --text:#E4EAF0; --text-2:#A3B0BD; --text-3:#7C8996;
+  --rule:#26313B; --rule-strong:#3A4854;
+  --accent:#4FBFB4; --accent-soft:#122E2C;
+  --copper:#D69A5C; --copper-soft:#2C2015;
+  --crimson:#E08585; --crimson-soft:#2E1919;
+  --code-bg:#0F161C;
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--ground); color:var(--text);
+  font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:16.5px; line-height:1.68; margin:0;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1180px;margin:0 auto;padding:0 clamp(18px,4vw,44px)}
+.col{max-width:var(--measure)}
+
+/* ---------- masthead ---------- */
+.mast{padding:clamp(52px,9vw,104px) 0 40px;border-bottom:1px solid var(--rule)}
+.eyebrow{
+  font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:500;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin:0 0 20px
+}
+h1{
+  font-family:Spectral,Georgia,serif;font-weight:700;
+  font-size:clamp(2.3rem,6vw,4rem);line-height:1.04;letter-spacing:-.02em;
+  margin:0 0 22px;text-wrap:balance
+}
+.standfirst{
+  font-family:Spectral,Georgia,serif;font-size:clamp(1.08rem,2.3vw,1.35rem);
+  line-height:1.56;color:var(--text-2);max-width:60ch;margin:0 0 34px
+}
+.mast-meta{
+  display:flex;flex-wrap:wrap;gap:10px 30px;
+  font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:var(--text-3)
+}
+.mast-meta b{color:var(--text-2);font-weight:500}
+
+/* ---------- layout ---------- */
+.body-grid{display:grid;grid-template-columns:1fr;gap:0}
+@media(min-width:1040px){
+  .body-grid{grid-template-columns:200px 1fr;gap:56px;align-items:start}
+  .rail{position:sticky;top:28px;padding-top:52px}
+}
+.rail{display:none}
+@media(min-width:1040px){.rail{display:block}}
+.rail-title{
+  font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--text-3);margin:0 0 14px
+}
+.rail a{
+  display:block;font-size:13.2px;color:var(--text-2);text-decoration:none;
+  padding:5px 0 5px 12px;border-left:2px solid var(--rule);line-height:1.4
+}
+.rail a:hover{color:var(--accent);border-left-color:var(--accent)}
+.rail a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+section{padding:clamp(44px,6vw,72px) 0;border-bottom:1px solid var(--rule)}
+section:last-of-type{border-bottom:none}
+
+h2{
+  font-family:Spectral,Georgia,serif;font-weight:600;
+  font-size:clamp(1.6rem,3.4vw,2.15rem);line-height:1.16;letter-spacing:-.015em;
+  margin:0 0 8px;text-wrap:balance;display:flex;gap:16px;align-items:baseline
+}
+h2 .num{
+  font-family:"IBM Plex Mono",monospace;font-size:.62em;font-weight:500;
+  color:var(--accent);letter-spacing:0;flex:none
+}
+.sec-sub{color:var(--text-3);font-size:14.5px;margin:0 0 30px;padding-left:0}
+@media(min-width:640px){.sec-sub{padding-left:52px}}
+h3{
+  font-family:Spectral,Georgia,serif;font-weight:600;font-size:1.24rem;
+  margin:38px 0 12px;line-height:1.3;text-wrap:balance;color:var(--text)
+}
+h4{
+  font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:600;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--text-3);
+  margin:30px 0 10px
+}
+p{margin:0 0 17px;max-width:var(--measure)}
+ul,ol{max-width:var(--measure);padding-left:22px;margin:0 0 17px}
+li{margin-bottom:9px}
+li::marker{color:var(--text-3)}
+strong{font-weight:600;color:var(--text)}
+em{font-style:italic}
+a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+
+code{
+  font-family:"IBM Plex Mono",monospace;font-size:.855em;
+  background:var(--code-bg);padding:.13em .38em;border-radius:3px;
+  color:var(--text);border:1px solid var(--rule)
+}
+pre{
+  background:var(--code-bg);border:1px solid var(--rule);border-radius:5px;
+  padding:16px 18px;overflow-x:auto;margin:0 0 20px;line-height:1.6
+}
+pre code{background:none;border:none;padding:0;font-size:13px}
+
+/* ---------- tables ---------- */
+.tbl-wrap{overflow-x:auto;margin:0 0 22px;border:1px solid var(--rule);border-radius:5px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:min(100%,460px)}
+caption{
+  caption-side:top;text-align:left;padding:13px 16px;border-bottom:1px solid var(--rule);
+  font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--text-3);background:var(--surface-2)
+}
+th,td{padding:9px 14px;text-align:left;border-bottom:1px solid var(--rule)}
+th{
+  font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;
+  letter-spacing:.07em;text-transform:uppercase;color:var(--text-3);white-space:nowrap
+}
+/* Greek alpha uppercases to a glyph indistinguishable from Latin A. */
+th.sym{text-transform:none;font-size:12px}
+td{font-variant-numeric:tabular-nums;color:var(--text-2)}
+td:first-child{color:var(--text)}
+tbody tr:last-child td{border-bottom:none}
+tr.hi td{background:var(--accent-soft);color:var(--text);font-weight:500}
+tr.hi td:first-child{font-weight:600}
+td.num{font-family:"IBM Plex Mono",monospace}
+
+/* ---------- callouts ---------- */
+.find,.overturn,.note{
+  border-left:3px solid;padding:17px 20px;margin:0 0 22px;border-radius:0 5px 5px 0;
+  max-width:var(--measure)
+}
+.find{background:var(--copper-soft);border-color:var(--copper)}
+.overturn{background:var(--crimson-soft);border-color:var(--crimson)}
+.note{background:var(--surface);border-color:var(--rule-strong)}
+.find > .lbl,.overturn > .lbl,.note > .lbl{
+  display:block;font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;
+  letter-spacing:.13em;text-transform:uppercase;margin:0 0 8px
+}
+.find > .lbl{color:var(--copper)}
+.overturn > .lbl{color:var(--crimson)}
+.note > .lbl{color:var(--text-3)}
+.find p,.overturn p,.note p{margin:0 0 11px}
+.find p:last-child,.overturn p:last-child,.note p:last-child{margin:0}
+
+/* ---------- stat row ---------- */
+.stats{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));
+  gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:5px;
+  overflow:hidden;margin:0 0 26px
+}
+.stat{background:var(--surface);padding:16px 18px}
+.stat .k{
+  font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--text-3);display:block;margin-bottom:6px
+}
+.stat .v{
+  font-family:"IBM Plex Mono",monospace;font-size:1.42rem;font-weight:600;
+  color:var(--text);font-variant-numeric:tabular-nums;line-height:1.1;display:block
+}
+.stat .c{font-size:12px;color:var(--text-3);display:block;margin-top:4px}
+
+/* ---------- pipeline diagram ---------- */
+.flow{
+  display:flex;flex-wrap:wrap;align-items:stretch;gap:8px;margin:0 0 22px;
+  padding:20px;background:var(--surface);border:1px solid var(--rule);border-radius:5px
+}
+.node{
+  flex:1 1 118px;background:var(--surface-2);border:1px solid var(--rule);
+  border-radius:4px;padding:11px 12px;min-width:0
+}
+.node .t{
+  font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;
+  color:var(--text);display:block;margin-bottom:3px
+}
+.node .d{font-size:11.5px;color:var(--text-3);display:block;line-height:1.4}
+.node.gate{background:var(--crimson-soft);border-color:var(--crimson)}
+.node.gate .t{color:var(--crimson)}
+.arrow{display:flex;align-items:center;color:var(--rule-strong);font-size:15px;flex:none}
+
+.lede{font-size:1.06rem;color:var(--text-2);max-width:64ch}
+.kicker{
+  font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--text-3);margin:0 0 10px
+}
+hr{border:none;border-top:1px solid var(--rule);margin:34px 0}
+.foot{padding:44px 0 68px;color:var(--text-3);font-size:13.5px}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+
+<header class="mast">
+  <p class="eyebrow">Engineering Report · MS MARCO-XI · 2026</p>
+  <h1>A Voice RAG System, and Everything It Got Wrong First</h1>
+  <p class="standfirst">Building a Hindi speech-to-answer retrieval pipeline that holds a sub-200&nbsp;ms retrieval budget over 103,068 chunks — and a record of how measurement overturned nearly every default along the way.</p>
+  <div class="mast-meta">
+    <span><b>Corpus</b> 103,068 chunks</span>
+    <span><b>Retrieval P50</b> 11.54 ms</span>
+    <span><b>MRR@10</b> 0.551</span>
+    <span><b>Status</b> deployed, HF ZeroGPU</span>
+  </div>
+</header>
+
+<div class="body-grid">
+<nav class="rail" aria-label="Contents">
+  <p class="rail-title">Contents</p>
+  <a href="#abstract">Abstract</a>
+  <a href="#motivation">1 · Motivation</a>
+  <a href="#background">2 · Background</a>
+  <a href="#data">3 · Dataset</a>
+  <a href="#architecture">4 · Architecture</a>
+  <a href="#algorithms">5 · Algorithms</a>
+  <a href="#method">6 · Methodology</a>
+  <a href="#results">7 · Results</a>
+  <a href="#overturned">8 · Overturned</a>
+  <a href="#failures">9 · Failure analysis</a>
+  <a href="#deploy">10 · Deployment</a>
+  <a href="#limits">11 · Limitations</a>
+  <a href="#conclusion">12 · Conclusion</a>
+  <a href="#resume">13 · Résumé &amp; interview</a>
+</nav>
+
+<main>
+
+<section id="abstract">
+<h2><span class="num">00</span> Abstract</h2>
+<p class="sec-sub">What was built, and what the measurements showed.</p>
+
+<p class="lede">This project implements an end-to-end voice question-answering system over a multilingual passage corpus: a user speaks a question in Hindi, the audio is transcribed, relevant passages are retrieved from a 103,068-chunk index, and an answer is returned that is grounded in what was retrieved — or explicitly refused when nothing supports one.</p>
+
+<p>The engineering target was a query-time retrieval budget under 200&nbsp;ms. The final system achieves <strong>11.54&nbsp;ms at P50 and 53.57&nbsp;ms at P100</strong> on an RTX 4060, measured over 200 queries after warm-up. Retrieval quality on 1,219 gold-labelled queries reaches <strong>MRR@10 0.551</strong> and <strong>Recall@5 0.744</strong> in its strongest configuration. A cross-encoder abstention gate reduces ungrounded answers on genuinely unanswerable questions from <strong>100% to 14.7%</strong>.</p>
+
+<p>The more transferable result is methodological. Every significant default in the system was chosen by ablation rather than convention, and most of those ablations contradicted the conventional choice: semantic chunking lost to plain sentence splitting, hybrid dense+sparse retrieval lost to dense-only, and an abstention threshold that scored 0.93 balanced accuracy against easy negatives turned out to block only 26% of realistic ones. Three separate tuned values reversed when the corpus grew from 5,000 to 100,000 chunks, establishing that in this system <em>every hyperparameter is corpus-size dependent</em>.</p>
+</section>
+
+<section id="motivation">
+<h2><span class="num">01</span> Motivation</h2>
+<p class="sec-sub">The problem, and why the obvious framing of it is wrong.</p>
+
+<p>Retrieval-Augmented Generation exists to solve a specific failure of language models: they answer confidently from parametric memory, which is frozen at training time and cannot be audited. RAG addresses this by retrieving source passages at query time and constraining the answer to them, which makes answers both updatable and traceable.</p>
+
+<p>Adding <em>voice</em> input raises the stakes on latency, because speech is a conversational medium and people tolerate far less delay in conversation than in typing. Adding a <em>low-resource language</em> — Hindi, in Devanagari script — raises the stakes on retrieval quality, because most retrieval components are tuned and benchmarked on English.</p>
+
+<h3>The 200 ms requirement, and why it cannot mean what it appears to</h3>
+<p>The original specification called for the full pipeline to complete in under 200&nbsp;ms. Measurement shows this is not achievable by any system built on a hosted speech-to-text API, and it is worth being precise about why rather than quietly redefining the target.</p>
+
+<div class="tbl-wrap">
+<table>
+<caption>Measured end-to-end voice path, warm process</caption>
+<thead><tr><th>Stage</th><th>Measured</th><th>Nature</th></tr></thead>
+<tbody>
+<tr><td>Speech-to-text (Sarvam)</td><td class="num">1,139–2,566 ms</td><td>network round trip</td></tr>
+<tr class="hi"><td>Retrieval (embed + search)</td><td class="num">13.6 ms</td><td>local compute</td></tr>
+<tr><td>Generation (extractive)</td><td class="num">32 ms</td><td>local compute</td></tr>
+<tr><td><strong>Total</strong></td><td class="num"><strong>1,185–2,612 ms</strong></td><td>—</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="find">
+<span class="lbl">Measured finding</span>
+<p>The speech-to-text network hop alone is roughly <strong>100× the entire local retrieval segment</strong>. No pipeline that calls a hosted STT service reaches 200&nbsp;ms end-to-end; the round trip alone exceeds it fivefold.</p>
+</div>
+
+<p>The honest resolution is to scope the budget to what it can meaningfully describe — the <strong>query-time retrieval segment</strong>: embedding the query, searching the index, and optional reranking. That segment is local, is genuinely fast, and is the part an engineer actually controls. Both numbers are reported together throughout, and the harness times every stage separately so the split is always visible rather than hidden inside an average.</p>
+
+<p>This framing decision matters beyond bookkeeping. A system that reports only the flattering number is not measuring; it is marketing. The instrumentation exists specifically so the unflattering number cannot be avoided.</p>
+</section>
+<section id="background">
+<h2><span class="num">02</span> Background</h2>
+<p class="sec-sub">The concepts this system is built from, defined plainly.</p>
+
+<p>This section defines the technical vocabulary used throughout. If you already know what a bi-encoder is, skip to §3.</p>
+
+<h3>Embeddings and dense retrieval</h3>
+<p>An <strong>embedding</strong> is a fixed-length vector of numbers that represents a piece of text's meaning. A model is trained so that texts with similar meaning land close together in that vector space. "What is a corporation?" and "A corporation is a legal entity…" end up near each other even though they share few words.</p>
+<p><strong>Dense retrieval</strong> exploits this: embed every passage once at index time, embed the query at search time, and return the passages whose vectors are closest. Closeness is measured by <strong>cosine similarity</strong> — the cosine of the angle between two vectors, ranging from −1 to 1. Because the vectors here are normalised to unit length, cosine similarity reduces to a plain dot product, which is why it is fast.</p>
+<p>This is called a <strong>bi-encoder</strong> arrangement: query and passage are encoded <em>independently</em>, never seeing each other. That independence is what makes it scalable — passage vectors are computed once, offline — and it is also its main weakness, which §5 returns to.</p>
+
+<h3>Sparse retrieval and BM25</h3>
+<p><strong>Sparse retrieval</strong> matches on literal words rather than meaning. <strong>BM25</strong> is the standard algorithm: it scores a document higher when it contains the query's rare words, more times, in a shorter document. "Sparse" refers to the representation — a vector with one dimension per vocabulary word, almost all zeros.</p>
+<p>Dense and sparse fail differently, which is why combining them is conventional. Dense handles paraphrase and synonymy; sparse handles exact strings like names, codes and numbers that an embedding may blur. §7 shows that on this corpus the combination did not, in fact, help.</p>
+
+<h3>Chunking</h3>
+<p>Passages must be split into retrievable units. The unit matters: too large and the embedding averages several topics into a vague vector; too small and it loses the context needed to answer. Four strategies were implemented and compared — fixed-size windows, sentence packing, recursive separator splitting, and semantic (embedding-based) boundary detection. §7 reports which won.</p>
+
+<h3>Approximate nearest neighbour search and HNSW</h3>
+<p>Comparing a query against all 103,068 vectors exhaustively is <em>exact</em> but linear in corpus size. <strong>Approximate nearest neighbour (ANN)</strong> search trades a small amount of recall for a large speed gain. <strong>HNSW</strong> — Hierarchical Navigable Small World — is the ANN structure used here, described in §5.</p>
+
+<h3>Cross-encoder reranking</h3>
+<p>A <strong>cross-encoder</strong> takes the query and one passage <em>together</em> and outputs a relevance score. Because it can attend across both texts, it is markedly more accurate than a bi-encoder — and far too slow to run over a whole corpus. The standard pattern is a two-stage cascade: retrieve a cheap candidate set with the bi-encoder, then rerank those candidates with the cross-encoder.</p>
+
+<h3>Guardrails, grounding and abstention</h3>
+<p>An answer is <strong>grounded</strong> when it is supported by the retrieved context. The characteristic RAG failure is a fluent answer to a question the corpus cannot support — the retriever returns its best match regardless of whether that match is any good, and generation proceeds on it. <strong>Abstention</strong> is the guardrail: detect that nothing retrieved is relevant enough and decline. §7 measures what this buys, and §8 records how badly it was calibrated the first time.</p>
+</section>
+
+<section id="data">
+<h2><span class="num">03</span> Dataset</h2>
+<p class="sec-sub">MS MARCO-XI, and the label that makes the whole evaluation possible.</p>
+
+<p>The corpus is <code>ai4bharat/MSMARCO-XI</code> — a multilingual translation of MS MARCO, a large passage-ranking benchmark derived from real Bing queries. The full dataset is roughly 11.5M rows and 55&nbsp;GB, so it is streamed and capped rather than downloaded whole.</p>
+
+<p>Each row contains a query, a gold answer, and a <code>passages</code> field holding parallel lists: the English passages, their translations, and an <code>is_selected</code> flag.</p>
+
+<div class="find">
+<span class="lbl">The critical affordance</span>
+<p><code>is_selected == 1</code> marks the passage a human judged to actually answer the query. This label is what converts "the retrieval seems good" into a measurable claim — it makes Recall@k, MRR and nDCG computable rather than guessed. Every quantitative result in this report rests on it.</p>
+</div>
+
+<h3>Two indexes, deliberately separate</h3>
+<p>The system builds two distinct indexes, and conflating them would invalidate the evaluation:</p>
+<ul>
+<li>The <strong>serving index</strong> (<code>ingest.py</code> → <code>data/index/</code>) is the corpus the live demo answers from — 10,000 rows, 103,068 chunks.</li>
+<li>The <strong>evaluation index</strong> (<code>eval.py</code>, in memory) is rebuilt per run and tracks which chunk ids came from gold passages, so metrics can be computed. Reported results use 2,000 rows → 21,657 chunks and 1,219 gold-labelled queries.</li>
+</ul>
+
+<h3>Dataset traps encountered</h3>
+<p>Two cost real time and are worth recording, because both fail quietly rather than loudly:</p>
+<ul>
+<li><strong>The documented per-language configs do not exist.</strong> <code>load_dataset(DATASET_ID, "hi")</code> fails — the only available config is <code>default</code>. The per-language data lives in separate parquet files, loaded directly by URL.</li>
+<li><strong>There is no <code>en</code> language code.</strong> English is not a separate file; it lives <em>inside</em> each language's parquet as <code>English_passages</code> / <code>Eng_Query</code> / <code>Eng_Answer</code>. Switching only the passage field leaves Hindi queries pointed at English passages — which does not raise an error, it silently returns poor retrieval. The <code>USE_ENGLISH</code> flag moves all three fields together and the config refuses to start on a half-applied switch.</li>
+</ul>
+</section>
+
+<section id="architecture">
+<h2><span class="num">04</span> Architecture</h2>
+<p class="sec-sub">Stage order, and what each stage is responsible for.</p>
+
+<div class="flow">
+  <div class="node"><span class="t">audio</span><span class="d">WebM/Opus from browser mic</span></div>
+  <div class="arrow">→</div>
+  <div class="node"><span class="t">STT</span><span class="d">Sarvam Saaras v3</span></div>
+  <div class="arrow">→</div>
+  <div class="node gate"><span class="t">gate: input</span><span class="d">empty / unsafe</span></div>
+  <div class="arrow">→</div>
+  <div class="node"><span class="t">embed</span><span class="d">BGE-M3, 1024-d</span></div>
+  <div class="arrow">→</div>
+  <div class="node"><span class="t">search</span><span class="d">FAISS HNSW + BM25</span></div>
+  <div class="arrow">→</div>
+  <div class="node gate"><span class="t">gate: off-topic</span><span class="d">abstain if weak</span></div>
+  <div class="arrow">→</div>
+  <div class="node"><span class="t">generate</span><span class="d">extractive span</span></div>
+  <div class="arrow">→</div>
+  <div class="node gate"><span class="t">gate: grounding</span><span class="d">overlap check</span></div>
+</div>
+
+<h3>Component choices</h3>
+<div class="tbl-wrap">
+<table>
+<caption>Stack, and the reason for each selection</caption>
+<thead><tr><th>Component</th><th>Choice</th><th>Reason</th></tr></thead>
+<tbody>
+<tr><td>Speech-to-text</td><td>Sarvam Saaras v3</td><td>Indic-specialised; strong Devanagari accuracy</td></tr>
+<tr><td>Embedder</td><td>BAAI/bge-m3</td><td>Multilingual incl. Indic; 1024-d; fits 8 GB VRAM</td></tr>
+<tr><td>Vector index</td><td>FAISS HNSW</td><td>0.57 ms over 103k vectors; scales to millions</td></tr>
+<tr><td>Lexical index</td><td>bm25s</td><td>Sparse-matrix BM25; 652× faster than rank_bm25 (§8)</td></tr>
+<tr><td>Reranker</td><td>bge-reranker-v2-m3</td><td>Pairs with BGE-M3; off by default on latency grounds</td></tr>
+<tr><td>Generation</td><td>Extractive</td><td>~30 ms and grounded by construction (§7)</td></tr>
+<tr><td>Serving</td><td>FastAPI + Gradio</td><td>Gradio is the only SDK HF ZeroGPU supports</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>The harness</h3>
+<p>The pipeline is not a script of sequential calls; it is a staged orchestrator with a defined contract. Each stage is timed independently into a <code>StageTiming</code> record, network stages carry retries with exponential backoff and an enforced timeout, inputs and outputs are Pydantic models rather than loose dicts, and failures degrade rather than propagate — if LLM generation fails, extractive generation answers instead.</p>
+
+<p>The per-stage timing is not incidental. It is what made the BM25 regression in §8 diagnosable in minutes: the numbers pointed directly at the offending component instead of requiring a bisect.</p>
+
+<div class="note">
+<span class="lbl">Design note</span>
+<p>Graceful degradation has a cost that §9 documents: a fallback that silently catches every exception will hide a component that is <em>completely broken</em>. The degradation is correct; the missing piece was testing the primary path directly rather than through its own fallback.</p>
+</div>
+</section>
+<section id="algorithms">
+<h2><span class="num">05</span> Algorithms</h2>
+<p class="sec-sub">The mathematics actually running, and what each formula is doing.</p>
+
+<h3>BM25 — Best Matching 25</h3>
+<p>BM25 scores how well a document matches a query on literal word overlap. For query <em>Q</em> and document <em>D</em>:</p>
+<pre><code>score(D, Q) = Σ  IDF(qᵢ) ·  f(qᵢ,D) · (k₁ + 1)
+              qᵢ         ─────────────────────────────────
+                         f(qᵢ,D) + k₁ · (1 − b + b · |D|/avgdl)</code></pre>
+<p>Three ideas are encoded here, and the third caused a real bug in this project:</p>
+<ul>
+<li><strong>IDF (inverse document frequency)</strong> — rare words carry more signal than common ones. Matching "corporation" says more than matching "the".</li>
+<li><strong>Term-frequency saturation</strong> — the <code>k₁</code> term makes repeated occurrences yield diminishing returns. Ten mentions of a word are not ten times more relevant than one.</li>
+<li><strong>Length normalisation</strong> — the <code>b · |D|/avgdl</code> term penalises long documents, on the reasoning that a match in a short document is more meaningful.</li>
+</ul>
+<div class="overturn">
+<span class="lbl">Where this bit</span>
+<p>Length normalisation <em>rewards</em> very short documents. Degenerate two-word chunks such as <code>"क्या है?"</code> ("what is?") scored <strong>BM25 14.5</strong> and outranked genuine passages — becoming the top-1 result the answer was generated from. The fix was not to BM25 but to chunking: merge fragments below 80 characters. Dense nDCG@10 rose <strong>26%</strong> (0.416 → 0.525).</p>
+</div>
+
+<h3>Cosine similarity</h3>
+<p>Dense relevance is the cosine of the angle between query and passage vectors:</p>
+<pre><code>cos(A,B) = (A · B) / (‖A‖ · ‖B‖)</code></pre>
+<p>Vectors are L2-normalised at index time, so ‖A‖ = ‖B‖ = 1 and this collapses to a dot product — one fused multiply-add per dimension, which is why FAISS can search 103,068 vectors in 0.57&nbsp;ms.</p>
+
+<h3>HNSW — Hierarchical Navigable Small World</h3>
+<p>HNSW is a multi-layer proximity graph. Each vector is a node connected to its near neighbours; higher layers are sparse and act as express lanes, lower layers dense and local.</p>
+<p>A search enters at the top layer, greedily walks to the closest node it can find, then drops a layer and repeats — coarse to fine, like a skip list in metric space. Complexity is roughly <strong>O(log N)</strong> rather than the O(N) of exhaustive search.</p>
+<p>Two parameters trade recall against cost: <code>M</code> (32 here) is the neighbour count per node, and <code>efSearch</code> (128) is the candidate-list breadth during search. Higher values find more true neighbours and cost more time and memory. The "approximate" is real — HNSW can miss a true nearest neighbour — but at 0.57&nbsp;ms per search over 103k vectors the trade is overwhelmingly favourable.</p>
+
+<h3>Score fusion: min-max versus RRF</h3>
+<p>Combining dense and sparse scores requires making them comparable, since cosine lives in [0,1] and BM25 is unbounded. Two approaches were implemented and compared.</p>
+<p><strong>Min-max normalisation</strong> rescales each score list into [0,1] over the candidate set, then blends by weight α:</p>
+<pre><code>norm(s) = (s − min) / (max − min)
+fused   = α · norm(dense) + (1 − α) · norm(bm25)</code></pre>
+<div class="overturn">
+<span class="lbl">Structural flaw</span>
+<p>Min-max normalisation pins the best candidate at exactly <strong>1.0 regardless of how weak it actually is</strong>, because the maximum always maps to 1. The scale is relative to whatever candidates happened to surface, not absolute. This same flaw independently broke the abstention guardrail (§8) — a threshold on a fused score could never fire, because gibberish also scored 1.0000.</p>
+</div>
+<p><strong>Reciprocal Rank Fusion (RRF)</strong> avoids this by combining <em>ranks</em> rather than scores:</p>
+<pre><code>RRF(d) = Σ  1 / (k + rankᵢ(d))        k = 60</code></pre>
+<p>Because rank is ordinal, RRF is immune to one signal's score distribution dominating. It is the standard remedy, and §7 reports what happened when it was tested.</p>
+
+<h3>Evaluation metrics</h3>
+<div class="tbl-wrap">
+<table>
+<caption>Metrics computed, and what each is sensitive to</caption>
+<thead><tr><th>Metric</th><th>Definition</th><th>Sensitive to</th></tr></thead>
+<tbody>
+<tr><td>Recall@k</td><td>|gold ∩ top-k| / |gold|</td><td>gold <em>count</em> — see caveat</td></tr>
+<tr><td>Hit@k</td><td>1 if any gold in top-k, else 0</td><td>presence only</td></tr>
+<tr><td>MRR@10</td><td>1 / rank of first gold</td><td>position of first hit</td></tr>
+<tr><td>nDCG@10</td><td>DCG / ideal DCG, log-discounted</td><td>full ranking quality</td></tr>
+<tr><td>Token F1</td><td>harmonic mean of token precision/recall</td><td>answer wording overlap</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>nDCG</strong> deserves unpacking since it is the least intuitive. Discounted Cumulative Gain sums the relevance of results with a logarithmic positional discount — a hit at rank 1 contributes 1/log₂(2) = 1.0, at rank 4 only 1/log₂(5) ≈ 0.43. Dividing by the ideal ordering's DCG normalises to [0,1], making scores comparable across queries with differing numbers of gold passages.</p>
+
+<div class="note">
+<span class="lbl">Metric caveat that shaped every comparison</span>
+<p><strong>Recall@k divides by the number of gold <em>chunks</em></strong>, so it is not comparable across chunking strategies that split the same passage differently. Semantic chunking emits ~40% more chunks, inflating its denominator. <strong>Hit@k and MRR@10 are denominator-free</strong> and are the fair cross-configuration comparisons. Conclusions in §7 are stated on those, which makes the reported margins smaller — and correct.</p>
+</div>
+
+<h3>Extractive generation</h3>
+<p>The default generator runs no language model. It embeds the query and each sentence of the top passage, then returns the two highest-cosine sentences in their original order. This is ~30&nbsp;ms, and grounded by construction — the output is verbatim source text, so it cannot hallucinate. It cannot synthesise or paraphrase either, which §7 quantifies against the LLM alternative.</p>
+</section>
+
+<section id="method">
+<h2><span class="num">06</span> Methodology</h2>
+<p class="sec-sub">How the system was actually built, in the order it happened.</p>
+
+<p>The working rule throughout: <strong>every quality claim must be backed by a number from the evaluation harness, and when a component is added, its evaluation is added with it.</strong> That rule is what produced the negative results in §7 — they were not sought, they emerged because the alternatives were measured rather than assumed.</p>
+
+<h4>Phase 1 — Baseline</h4>
+<p>Scaffold the pipeline, resolve the dataset loading traps (§3), build a 500-row smoke index, and establish the first latency and quality numbers. Deliberately small: the point was a working end-to-end path, not good results.</p>
+
+<h4>Phase 2 — Ablations</h4>
+<p>Sweep the choices that were guesses. Four chunking strategies; dense, sparse and hybrid retrieval; the fusion weight α across a grid; reranking on and off. Each measured on the same gold-labelled query set so results are comparable.</p>
+
+<h4>Phase 3 — Guardrails and faithfulness</h4>
+<p>Measure what abstention buys by running the identical query set with guardrails enabled and disabled. This required a deliberate design decision: the harness gained a <code>guardrails_enabled</code> flag purely so the unguarded baseline could be measured. A claim about reducing hallucination is meaningless without it.</p>
+
+<h4>Phase 4 — Scale</h4>
+<p>Grow the corpus 19× to 103,068 chunks and re-run everything. This phase produced the most valuable findings in the project, because it revealed that conclusions from Phase 2 did not survive it (§8).</p>
+
+<h4>Phase 5 — Deployment and packaging</h4>
+<p>Ship a live demo, then the packaging a portfolio project needs: license, CI, unit tests, documentation.</p>
+
+<h3>Experimental discipline</h3>
+<p>Three practices did the real work:</p>
+<ul>
+<li><strong>Warm up before timing.</strong> The first query pays model load and CUDA initialisation — roughly 10&nbsp;s. Left in the timed loop it lands in P100 and reports a cold start as tail latency. Uncorrected, the headline was <strong>9,845 ms</strong>; corrected, <strong>141 ms</strong> on the same build.</li>
+<li><strong>Use denominator-free metrics for cross-configuration claims</strong>, for the reason in §5.</li>
+<li><strong>Test the alternative explanation before accepting a negative result.</strong> Applied in §7's hybrid-retrieval finding, and it is the difference between a conclusion and an assumption.</li>
+</ul>
+</section>
+<section id="results">
+<h2><span class="num">07</span> Results</h2>
+<p class="sec-sub">Every number here is reproducible from the repository.</p>
+
+<div class="stats">
+  <div class="stat"><span class="k">Retrieval P50</span><span class="v">11.54</span><span class="c">ms · 103k chunks</span></div>
+  <div class="stat"><span class="k">Retrieval P100</span><span class="v">53.57</span><span class="c">ms · target 200</span></div>
+  <div class="stat"><span class="k">MRR@10</span><span class="v">0.551</span><span class="c">1,219 queries</span></div>
+  <div class="stat"><span class="k">Recall@5</span><span class="v">0.744</span><span class="c">hybrid + rerank</span></div>
+  <div class="stat"><span class="k">Ungrounded</span><span class="v">14.7%</span><span class="c">from 100%</span></div>
+</div>
+
+<h3>7.1 Latency</h3>
+<div class="tbl-wrap">
+<table>
+<caption>benchmark.py --n 200 · RTX 4060 · warmed up</caption>
+<thead><tr><th>Stage</th><th>P50</th><th>P70</th><th>P100</th></tr></thead>
+<tbody>
+<tr><td>embed</td><td class="num">9.49</td><td class="num">9.73</td><td class="num">40.23</td></tr>
+<tr><td>retrieve</td><td class="num">2.06</td><td class="num">2.33</td><td class="num">14.68</td></tr>
+<tr class="hi"><td>retrieval_total</td><td class="num">11.54</td><td class="num">11.86</td><td class="num">53.57</td></tr>
+</tbody>
+</table>
+</div>
+<p>P100 of 53.57&nbsp;ms against a 200&nbsp;ms target — and notably <em>faster</em> than the 19× smaller corpus was before the BM25 fix (P50 14.00 → 11.54&nbsp;ms). Enabling the cross-encoder adds ~332&nbsp;ms at P50, which breaks the budget outright; that is why reranking is off by default and is presented as an accuracy option rather than the standard path.</p>
+
+<h3>7.2 Retrieval quality</h3>
+<div class="tbl-wrap">
+<table>
+<caption>eval.py --rows 2000 · 1,219 gold-labelled queries · 21,657-chunk index</caption>
+<thead><tr><th>Configuration</th><th>R@1</th><th>R@5</th><th>Hit@5</th><th>MRR@10</th><th>nDCG@10</th><th>Ans F1</th></tr></thead>
+<tbody>
+<tr><td>BM25 only</td><td class="num">0.136</td><td class="num">0.402</td><td class="num">0.424</td><td class="num">0.259</td><td class="num">0.311</td><td class="num">0.196</td></tr>
+<tr><td>Dense only</td><td class="num">0.312</td><td class="num">0.701</td><td class="num">0.727</td><td class="num">0.494</td><td class="num">0.562</td><td class="num">0.281</td></tr>
+<tr><td>Hybrid α=0.6</td><td class="num">0.212</td><td class="num">0.612</td><td class="num">0.641</td><td class="num">0.400</td><td class="num">0.478</td><td class="num">0.240</td></tr>
+<tr class="hi"><td>Hybrid + rerank</td><td class="num">0.364</td><td class="num">0.744</td><td class="num">0.773</td><td class="num">0.551</td><td class="num">0.610</td><td class="num">0.293</td></tr>
+</tbody>
+</table>
+</div>
+<div class="note">
+<span class="lbl">Why these numbers are lower than an earlier run</span>
+<p>An earlier 500-row evaluation (5,592 chunks, 248 queries) scored MRR@10 <strong>0.606</strong> and Hit@5 <strong>0.871</strong>. Quadrupling the haystack drops those to 0.551 and 0.773. Nothing regressed — the earlier task was simply easier. Retrieval metrics are a property of <em>corpus size as much as retriever quality</em>, so an MRR quoted without its corpus size conveys very little. The larger-corpus numbers are the credible ones and are what this report reports.</p>
+</div>
+
+<h3>7.3 Chunking strategy</h3>
+<div class="tbl-wrap">
+<table>
+<caption>All four strategies · same 248 gold queries · hybrid + rerank</caption>
+<thead><tr><th>Strategy</th><th>Chunks</th><th>R@5</th><th>Hit@5</th><th>MRR@10</th><th>nDCG@10</th></tr></thead>
+<tbody>
+<tr class="hi"><td>sentence</td><td class="num">5,592</td><td class="num">0.843</td><td class="num">0.871</td><td class="num">0.606</td><td class="num">0.673</td></tr>
+<tr><td>fixed</td><td class="num">5,602</td><td class="num">0.832</td><td class="num">0.875</td><td class="num">0.612</td><td class="num">0.669</td></tr>
+<tr><td>recursive</td><td class="num">5,958</td><td class="num">0.827</td><td class="num">0.879</td><td class="num">0.604</td><td class="num">0.663</td></tr>
+<tr><td>semantic</td><td class="num">7,975</td><td class="num">0.676</td><td class="num">0.839</td><td class="num">0.578</td><td class="num">0.574</td></tr>
+</tbody>
+</table>
+</div>
+<div class="overturn">
+<span class="lbl">Overturned assumption</span>
+<p><strong>The sophisticated option lost.</strong> Semantic chunking — embed every sentence, split at topic boundaries — came <em>last</em> on every metric while costing roughly <strong>10× more to build</strong>, because it runs the embedder over each sentence before indexing. Plain sentence packing won.</p>
+<p>Reading this honestly: the R@5 gap (0.843 vs 0.676) overstates the case, since semantic emits ~40% more chunks and inflates its own denominator. On the denominator-free metrics semantic still loses (Hit@5 0.839 vs 0.871; MRR@10 0.578 vs 0.606) — so the conclusion holds, on the smaller margin.</p>
+</div>
+<p>The top three sit within noise of each other. <code>sentence</code> is the default because it wins nDCG@10, produces the smallest index, and never cuts mid-sentence — which matters specifically because the extractive generator returns whole sentences.</p>
+
+<h3>7.4 Does hybrid retrieval help?</h3>
+<div class="tbl-wrap">
+<table>
+<caption>Fusion-weight sweep · α=1.0 is pure dense · 1,219 queries</caption>
+<thead><tr><th class="sym">α</th><th>0.0</th><th>0.6</th><th>0.8</th><th>0.9</th><th>1.0</th></tr></thead>
+<tbody>
+<tr><td>MRR@10 (min-max)</td><td class="num">0.259</td><td class="num">0.401</td><td class="num">0.458</td><td class="num">0.485</td><td class="num">0.496</td></tr>
+<tr><td>MRR@10 (RRF)</td><td class="num">0.259</td><td class="num">0.425</td><td class="num">0.464</td><td class="num">0.483</td><td class="num">0.495</td></tr>
+</tbody>
+</table>
+</div>
+<div class="overturn">
+<span class="lbl">Overturned assumption</span>
+<p><strong>Adding BM25 at any weight made retrieval worse.</strong> Hybrid dense+sparse retrieval is close to received wisdom in RAG; on this corpus at this scale it lost to dense-only.</p>
+<p>Crucially, the likelier alternative explanation was tested first. The suspicion was that <em>min-max fusion</em> was at fault rather than BM25 — it has the structural flaw described in §5. RRF, the standard remedy, was implemented and swept. It <em>did</em> help mid-range (α=0.6: 0.425 vs 0.401) but still peaked at pure dense. So both are true: the fusion was mildly suboptimal <em>and</em> BM25 genuinely does not help here.</p>
+</div>
+<p>A negative result that survives its own strongest counter-argument is worth considerably more than one that was never challenged. BM25 remains wired in and one config change away, because the answer is corpus-dependent rather than permanent — it <em>did</em> help at 5,442 chunks.</p>
+
+<h3>7.5 What the guardrails buy</h3>
+<div class="tbl-wrap">
+<table>
+<caption>faithfulness.py --n 150 · same queries, guardrails on vs off · 103k chunks</caption>
+<thead><tr><th>Gate</th><th>Answers answerable</th><th>Answers unanswerable</th><th>Added latency</th></tr></thead>
+<tbody>
+<tr><td>Guardrails OFF</td><td class="num">100.0%</td><td class="num">100.0%</td><td>—</td></tr>
+<tr><td>Cosine (fast path)</td><td class="num">88.7%</td><td class="num">52.7%</td><td class="num">0 ms</td></tr>
+<tr class="hi"><td>Cross-encoder</td><td class="num">76.7%</td><td class="num">14.7%</td><td class="num">~332 ms</td></tr>
+</tbody>
+</table>
+</div>
+<p>Ungrounded answers on genuinely unanswerable questions fall from <strong>100% to 14.7%</strong> — an 85% reduction. Both columns are reported deliberately: a guardrail that abstained on everything would post a perfect 0% hallucination rate while being useless. The cost is real — 23 points of coverage on answerable questions.</p>
+<p>The negative set is what makes this measurement meaningful. It is <em>not</em> hand-written nonsense; it is real MS MARCO queries drawn from rows <em>after</em> the indexed slice — natural, on-domain questions whose passages simply were never indexed. §8 records what happened when easier negatives were used instead.</p>
+
+<h3>7.6 Why a cross-encoder</h3>
+<div class="tbl-wrap">
+<table>
+<caption>Discriminative power on answerable vs unanswerable queries</caption>
+<thead><tr><th>Discriminator</th><th>Answerable</th><th>Unanswerable</th><th>Gap</th><th>Best bal. acc</th></tr></thead>
+<tbody>
+<tr><td>Bi-encoder cosine</td><td class="num">0.669</td><td class="num">0.590</td><td class="num">0.079</td><td class="num">0.710</td></tr>
+<tr class="hi"><td>Cross-encoder</td><td class="num">0.860</td><td class="num">0.350</td><td class="num">0.510</td><td class="num">0.813</td></tr>
+</tbody>
+</table>
+</div>
+<p>The cross-encoder separates the classes <strong>6.5× more widely</strong>, because it performs full query–document attention instead of comparing independently-encoded vectors. When reranking is already enabled its score is free — the computation has happened.</p>
+<p>A cascade was built to get that quality cheaply — cosine first, cross-encoder only for ambiguous cases — and <strong>rejected on measurement</strong>: the distributions overlap so heavily that 71% of queries land in the ambiguous band, costing ~236&nbsp;ms to buy <em>less</em> accuracy (0.793) than simply always reranking (0.813). There is no cheap version of this.</p>
+
+<h3>7.7 Generation mode</h3>
+<div class="tbl-wrap">
+<table>
+<caption>Extractive versus hosted LLM generation</caption>
+<thead><tr><th>Mode</th><th>Latency</th><th>Character</th></tr></thead>
+<tbody>
+<tr class="hi"><td>extractive (default)</td><td class="num">~30 ms</td><td>verbatim source sentences; grounded by construction</td></tr>
+<tr><td>llm (sarvam-105b)</td><td class="num">21 / 40 / 79 s</td><td>synthesises a definition; better prose</td></tr>
+</tbody>
+</table>
+</div>
+<p>The LLM answers are genuinely better — it defines a concept rather than quoting a sentence. At a 40-second median it is unusable interactively, so extractive remains the default. The decision is recorded with its numbers rather than as a preference.</p>
+</section>
+<section id="overturned">
+<h2><span class="num">08</span> What measurement overturned</h2>
+<p class="sec-sub">The central finding: in this system, no tuned value survived a change of scale.</p>
+
+<p>Three separate defaults reversed when the corpus grew from ~5,000 to ~100,000 chunks. Not one was a bug; each was a correct conclusion drawn at a scale that no longer applied.</p>
+
+<div class="tbl-wrap">
+<table>
+<caption>Tuned values before and after the 19× scale-up</caption>
+<thead><tr><th>Parameter</th><th>Small corpus</th><th>At scale</th><th>What changed</th></tr></thead>
+<tbody>
+<tr><td>CHUNK_STRATEGY</td><td>semantic (assumed)</td><td class="num">sentence</td><td>semantic worst on every metric, 10× build cost</td></tr>
+<tr><td>MIN_DENSE_SCORE</td><td class="num">0.50</td><td class="num">0.58 + CE gate</td><td>block rate fell 80% → 52.7%</td></tr>
+<tr><td>HYBRID_ALPHA</td><td class="num">0.9</td><td class="num">1.0</td><td>BM25 helped, then stopped helping</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>8.1 The guardrail that could not fire</h3>
+<p>The off-topic gate originally thresholded the <em>fused</em> retrieval score. Because fusion applies min-max normalisation over the candidate set (§5), the best candidate is pinned near 1.0 for <em>every</em> query. Measured directly:</p>
+<div class="tbl-wrap">
+<table>
+<caption>Fused score for the top result, by query type</caption>
+<thead><tr><th>Query</th><th>Fused score</th><th>Dense cosine</th></tr></thead>
+<tbody>
+<tr><td>Real Hindi question</td><td class="num">0.9726</td><td class="num">0.5689</td></tr>
+<tr><td><code>asdf qwerty zxcv</code></td><td class="num">1.0000</td><td class="num">0.4818</td></tr>
+</tbody>
+</table>
+</div>
+<div class="overturn">
+<span class="lbl">Overturned assumption</span>
+<p>Pure gibberish scored a <strong>perfect 1.0000</strong> — higher than a genuine question. The guardrail was <strong>mathematically incapable of firing</strong>. It had been in the codebase, documented as a safety feature, doing nothing. The fix was to threshold the dense cosine, which is absolute and comparable across queries rather than relative to whatever candidates surfaced.</p>
+</div>
+
+<h3>8.2 The threshold validated on easy cases</h3>
+<p>The rebuilt gate was calibrated against gibberish: "asdf qwerty", "what is the capital of Mars". It scored <strong>0.93 balanced accuracy</strong> and looked finished.</p>
+<p>Measured against realistic negatives — real MS MARCO queries whose passages were never indexed — that same threshold blocked only <strong>26%</strong> of them.</p>
+<div class="tbl-wrap">
+<table>
+<caption>Top dense cosine by negative type</caption>
+<thead><tr><th>Negative set</th><th>Max cosine</th><th>Blocks realistic negatives</th></tr></thead>
+<tbody>
+<tr><td>Gibberish (n=10)</td><td class="num">0.434</td><td class="num">26%</td></tr>
+<tr class="hi"><td>Real out-of-index queries (n=150)</td><td class="num">0.719</td><td class="num">80%</td></tr>
+</tbody>
+</table>
+</div>
+<p>Gibberish sits so far from everything in embedding space that it validates almost any threshold. The 0.93 was measuring the <em>test set</em>, not the guardrail. Recalibrating on hard negatives moved the threshold 0.50 → 0.58 and the block rate from 26% to 80%.</p>
+<div class="find">
+<span class="lbl">Transferable lesson</span>
+<p><strong>Calibrating a safety mechanism on easy cases gives you a number, not a guarantee.</strong> The calibration script now draws negatives from validation rows past the indexed slice, and prints the trivial-gibberish score purely as a reminder of how easy the old test was.</p>
+</div>
+
+<h3>8.3 The threshold that did not survive scaling</h3>
+<p>At 5,442 chunks the recalibrated cosine gate blocked 80% of unanswerable queries. At 103,068 chunks the same threshold blocks <strong>52.7%</strong>.</p>
+<p>Nothing regressed. A larger corpus means any query — answerable or not — is likelier to find a plausible near-match, so scores rise for both classes. Gibberish that scored 0.427 at 5.4k scores 0.499 at 103k.</p>
+<div class="find">
+<span class="lbl">Transferable lesson</span>
+<p><strong>An abstention threshold is only valid for the corpus size it was tuned on.</strong> This is invisible until you scale, which is the argument for scaling <em>before</em> believing a safety number. Re-running the faithfulness measurement after any corpus change is now standard practice in this repository, documented at the point of use.</p>
+</div>
+</section>
+
+<section id="failures">
+<h2><span class="num">09</span> Failure analysis</h2>
+<p class="sec-sub">Four failures that reported success. These are the expensive kind.</p>
+
+<h3>9.1 A 3.7× wrong extrapolation</h3>
+<p>Scaling to 103k chunks broke the latency budget: retrieval P50 91&nbsp;ms, P100 525&nbsp;ms. Profiling apportioned the blame immediately, thanks to per-stage timing:</p>
+<div class="tbl-wrap">
+<table>
+<caption>Retrieval cost decomposition at 103k chunks</caption>
+<thead><tr><th>Component</th><th>Per query</th><th>Share</th></tr></thead>
+<tbody>
+<tr><td>FAISS HNSW search</td><td class="num">0.57 ms</td><td class="num">&lt;1%</td></tr>
+<tr class="hi"><td>rank_bm25 get_scores</td><td class="num">63.75 ms</td><td class="num">99%</td></tr>
+</tbody>
+</table>
+</div>
+<p>Before the swap, a linear extrapolation from the 5.4k corpus predicted <strong>17&nbsp;ms</strong>. The real cost was 63.75&nbsp;ms — <strong>3.7× worse</strong>, because <code>rank_bm25</code> is pure Python and allocates a full-corpus array per query term, degrading superlinearly.</p>
+<p>Replacing it with <code>bm25s</code>, which is sparse-matrix backed, took the same query from 63.75&nbsp;ms to <strong>0.06&nbsp;ms — a 652× speedup</strong> — at 0.9983 rank correlation with the previous implementation. The 19×-larger corpus ended up <em>faster</em> than the small one had been.</p>
+
+<h3>9.2 A dead feature hidden by graceful degradation</h3>
+<p>LLM generation mode had never actually run. It was broken: the configured model <code>sarvam-m</code> had been deprecated and the API returned HTTP 400. Nobody noticed, because <code>generate()</code> catches every exception and falls back to extractive.</p>
+<div class="find">
+<span class="lbl">Transferable lesson</span>
+<p><strong>Graceful degradation hides breakage.</strong> The feature was dead and the system looked healthy. Fallback paths must be tested <em>directly</em>, bypassing the try/except — otherwise you are testing the fallback, not the feature.</p>
+</div>
+
+<h3>9.3 A timeout that was decorative</h3>
+<p>Fixing 9.2 exposed the next layer. <code>STAGE_TIMEOUT_S = 15</code> was declared in config and <strong>wired to nothing</strong> — which is how a 79-second API call ran to completion. A timeout that is advertised but never enforced is worse than none, because it buys false confidence.</p>
+<p>Enforcing it exposed a third layer: tenacity was retrying <em>timeouts</em>, so a slow model cost 3 × 15&nbsp;s = 46&nbsp;s before degrading — indistinguishable from a hang. Timeouts now fail fast into degradation; connection resets and 5xx still retry.</p>
+
+<h3>9.4 Five deploy failures, three of which exited zero</h3>
+<p>Deploying to Hugging Face ZeroGPU took five attempts. The failures are worth recording because most reported success:</p>
+<ol>
+<li><strong>402 on repo creation.</strong> Hardware must be specified <em>at creation</em>; a Gradio Space cannot be created on free CPU and then switched, because creation itself is rejected. There is no first step to take.</li>
+<li><strong>Frontmatter rejected after staging.</strong> A 61-character description against a 60-character limit, validated server-side <em>after</em> the Space was created and 555&nbsp;MB staged.</li>
+<li><strong>The 430 MB index silently dropped.</strong> Output read <code>Found 31 files … Committing 30/30</code>, exit code 0. Cause: the repository's own <code>.gitignore</code>, which <code>huggingface_hub</code> feeds to the preupload API — and which carries <code>*.faiss</code> to keep build artifacts out of git. Correct for the repo, catastrophic for the Space, where the index <em>is</em> the payload.</li>
+<li><strong>Removing it from the upload was insufficient.</strong> The resolution order ends with "the <code>.gitignore</code> already hosted on the Hub", and an earlier run had published one. It had to be deleted from the Space.</li>
+<li><strong>The demo exhausted its daily GPU quota in ~8 queries.</strong> <code>@spaces.GPU</code> wrapped the entire pipeline, so the Space held an accelerator throughout the 1–2.5&nbsp;s <em>network</em> call to STT. Restructured so only retrieval holds the GPU.</li>
+</ol>
+<div class="find">
+<span class="lbl">Transferable lesson</span>
+<p>Three of these five <strong>exited 0 while failing</strong>. The deploy script now verifies every staged file actually arrived and fails loudly naming what is missing. On this platform a green exit code is not evidence — and a deploy that succeeds while dropping your index is the worst available failure mode, because everything looks fine until the runtime logs say otherwise.</p>
+</div>
+</section>
+<section id="deploy">
+<h2><span class="num">10</span> Deployment</h2>
+<p class="sec-sub">Getting it hosted, and why the obvious route was closed.</p>
+
+<p>The system is live on Hugging Face Spaces running ZeroGPU, deployed by a single command. Getting there required working around a platform change that most documentation has not caught up with.</p>
+
+<h3>The free tier is not what it was</h3>
+<p>As of August 2026, Hugging Face gates compute Spaces behind a paid plan: <em>"Static Spaces are free for everyone. Gradio and Docker Spaces run on compute and require a paid plan to create."</em> Creating a Docker Space on a free account returns HTTP 402.</p>
+<div class="note">
+<span class="lbl">A distinction that saves a wasted day</span>
+<p>The gate is the <strong>Space type</strong>, not resource usage. Shrinking or quantising the model does <em>not</em> unlock a free Docker Space — an intuitive theory that is entirely wrong. The free path that does exist is <strong>Gradio + ZeroGPU</strong>: two Spaces free for accounts in good standing, and it grants a <em>real</em> GPU, so the measured latency figures roughly hold rather than needing a CPU caveat.</p>
+</div>
+
+<h3>Architecture of the deployment</h3>
+<ul>
+<li><strong>Gradio front end</strong> (<code>app_gradio.py</code>) — ZeroGPU supports only the Gradio SDK. Its <code>@spaces.GPU</code> decorator is a no-op off-Spaces, so the identical file runs locally.</li>
+<li><strong>GPU scope minimised</strong> — only retrieval and generation hold the accelerator. STT, a network call, runs outside it. This is the difference between ~8 demo queries per day and a usable allowance.</li>
+<li><strong>Prebuilt index shipped</strong> — 555&nbsp;MB via LFS. Building at startup would exceed the timeout.</li>
+<li><strong>Pinned torch</strong> — ZeroGPU supports a specific version range; leaving it unpinned lets pip install one outside that window and silently break GPU allocation.</li>
+<li><strong>Secrets at creation</strong> — the API key is set via <code>space_secrets</code>, never baked into an image.</li>
+</ul>
+
+<h3>Operational reality</h3>
+<p>The free ZeroGPU tier allows <strong>5 minutes of GPU per day, shared across all visitors</strong>. A demo link that returns a quota error reads as broken to someone who does not know that, so a recorded GIF sits in the README as a hedge and both surfaces state the limit explicitly.</p>
+
+<h3>Engineering support</h3>
+<p>The repository carries the packaging a portfolio project needs: MIT licence, GitHub Actions CI, and 25 unit tests. The metrics were deliberately extracted into a stdlib-only module (<code>src/metrics.py</code>) so CI can test them without torch, a GPU, a 460&nbsp;MB dataset or network access — the whole job runs in seconds. Four of those tests guard the CI badge itself against a workflow rename, which would otherwise blank it silently while tests kept passing.</p>
+</section>
+
+<section id="limits">
+<h2><span class="num">11</span> Limitations</h2>
+<p class="sec-sub">What this system does not establish.</p>
+
+<ul>
+<li><strong>Corpus scale.</strong> 103,068 chunks from a streamed 10,000-row subset. Real deployments run orders of magnitude larger, and this project's own central finding — that tuned values do not survive scale changes — applies to its own conclusions.</li>
+<li><strong>The chunking ablation ran at a smaller scale</strong> than the headline numbers (500 rows vs 2,000–10,000). Given three other values flipped with scale, the ordering of the top three strategies may too. What is unlikely to flip is semantic losing: it trails at every scale tested, at 10× the build cost.</li>
+<li><strong>Single language, single domain.</strong> Hindi over MS MARCO web passages. Nothing here establishes behaviour on other Indic scripts or specialised domains.</li>
+<li><strong>Answer quality is measured by token F1</strong> against a gold answer — a bag-of-words overlap metric that is blind to paraphrase. It rewards lexical similarity, not correctness.</li>
+<li><strong>The abstention negative set is n=150</strong> real out-of-index queries. Larger and more adversarial sets would tighten the estimate.</li>
+<li><strong>No human evaluation.</strong> Every quality number is automatic. Nobody read the answers and judged them.</li>
+<li><strong>Guardrail coverage cost is substantial.</strong> The cross-encoder gate refuses 23% of answerable questions. For a demo that is a defensible trade; for production it would need work.</li>
+</ul>
+
+<h3>Future work</h3>
+<ul>
+<li>Re-run the chunking ablation at 100k+ chunks to settle the ordering.</li>
+<li>Fine-tune the abstention gate rather than thresholding a similarity score — a small trained classifier over retrieval features would likely beat any single threshold.</li>
+<li>Streaming STT to overlap transcription with retrieval, cutting perceived latency.</li>
+<li>Quantise the embedder (int8) to widen deployment options.</li>
+<li>Human evaluation on a sample, to check what token F1 is missing.</li>
+</ul>
+</section>
+
+<section id="conclusion">
+<h2><span class="num">12</span> Conclusion</h2>
+<p class="sec-sub">What was built, and what it demonstrates.</p>
+
+<p>The system works: speech in Hindi produces a grounded answer, retrieval holds a P50 of 11.54&nbsp;ms and a P100 of 53.57&nbsp;ms over 103,068 chunks, quality reaches MRR@10 0.551 on 1,219 gold-labelled queries, and the abstention gate cuts ungrounded answers from 100% to 14.7%. It is deployed and publicly reachable.</p>
+
+<p>But the assembly is not the interesting part. Wiring an embedder to a vector index and a generation step is now a well-trodden path with good libraries. What distinguishes this build is that <strong>the defaults were treated as hypotheses</strong>, and most of them turned out to be wrong:</p>
+
+<ul>
+<li>The sophisticated chunker lost to the simple one, at 10× the cost.</li>
+<li>Hybrid retrieval — near-orthodoxy in RAG — lost to dense-only, and survived its own strongest counter-argument (RRF) before that was accepted.</li>
+<li>A guardrail documented as a safety feature was mathematically incapable of firing.</li>
+<li>Its replacement scored 0.93 on easy negatives and blocked 26% of realistic ones.</li>
+<li>Three separate tuned values reversed when the corpus grew 19×.</li>
+<li>A confident linear extrapolation was wrong by 3.7×.</li>
+<li>Three deploys reported success while shipping a Space that could not start.</li>
+</ul>
+
+<p>The unifying lesson is narrow and portable: <strong>a system that is not instrumented is a system whose failures announce themselves as successes.</strong> Per-stage timing turned a latency regression into a two-minute diagnosis. A guardrails-on/off harness turned "we have safety features" into a number. Upload verification turned a green exit code into a caught error. In every case the instrumentation, not the feature, is what produced the knowledge.</p>
+
+<p>The corollary is that <strong>measurement is only as good as its adversary.</strong> The guardrail calibrated on gibberish was measured, quantified, and reported at 0.93 — and worth almost nothing. A metric validated against easy cases is a number, not a guarantee.</p>
+</section>
+
+<section id="resume">
+<h2><span class="num">13</span> Résumé and interview</h2>
+<p class="sec-sub">How to present this, and how to defend it under questioning.</p>
+
+<h3>13.1 Résumé bullets</h3>
+<p>Lead with outcomes and keep every number paired with its scale — an MRR without a corpus size invites the exact follow-up you cannot answer.</p>
+<div class="note">
+<span class="lbl">Copy-paste</span>
+<ul>
+<li>Built and deployed a voice-enabled Hindi RAG pipeline (Sarvam STT → BGE-M3 dense retrieval over 103K FAISS-HNSW chunks → grounded generation) with query-time retrieval at 11.5&nbsp;ms P50 / 53.6&nbsp;ms P100, holding a sub-200&nbsp;ms budget on a corpus 19× the initial build.</li>
+<li>Ran controlled ablations on gold-labeled MS MARCO-XI (chunking; dense/BM25/hybrid; RRF vs min-max fusion) and chose dense-only over hybrid on a negative result validated against its strongest counter-explanation.</li>
+<li>Profiled a retrieval regression to rank_bm25 consuming 99% of latency (superlinear degradation); swapped to a sparse-matrix BM25 for a 652× speedup at 0.998 rank correlation.</li>
+<li>Cut ungrounded answers from 100% to 15% with a cross-encoder abstention gate calibrated on realistic negatives; documented that abstention thresholds must be re-tuned per corpus size.</li>
+<li>Diagnosed five silent Hugging Face deploy failures (three exited 0 while failing), including a .gitignore rule that dropped the 430&nbsp;MB index from the upload; shipped a one-command ZeroGPU deploy script.</li>
+</ul>
+</div>
+
+<h3>13.2 What to emphasise, and why</h3>
+<p>Many candidates can assemble a RAG pipeline; the tutorials are good and the libraries do the hard parts. Far fewer can say <em>which of their defaults are wrong and how they found out</em>. That is the differentiator, and it is what these bullets are built around: three of the five describe diagnosis rather than construction.</p>
+<div class="find">
+<span class="lbl">Framing that works</span>
+<p>"I built a voice RAG system, and then I spent most of the time proving my own defaults wrong" is a far stronger opening than a feature list. It signals that you measure, and it sets up every follow-up question to land on ground you have actually covered.</p>
+</div>
+
+<h3>13.3 Anticipated questions</h3>
+
+<h4>"Sub-200 ms on a voice pipeline? That seems impossible."</h4>
+<p>It is, end-to-end, and the report says so in its first section. The STT hop alone is 1.1–2.6&nbsp;s — roughly 100× the local retrieval segment. The budget is scoped to query-time retrieval, which is the part actually under engineering control, and both numbers are always reported together. <em>Volunteering this before being challenged is stronger than defending it after.</em></p>
+
+<h4>"Why dense-only? Hybrid retrieval is standard."</h4>
+<p>It is, and it lost here. BM25 helped at 5,442 chunks and stopped helping at 21,657 — it weakens relatively as the corpus grows (MRR@10 0.259 vs dense 0.494). Before accepting that, I tested the likelier explanation: that min-max fusion was at fault, since it pins the best candidate at 1.0 however weak it is. RRF helped mid-range but still peaked at pure dense. Both were true — the fusion was mildly suboptimal <em>and</em> BM25 does not help this corpus. It stays wired in because the answer is corpus-dependent.</p>
+
+<h4>"How do you know the guardrail actually works?"</h4>
+<p>Because I measured it with the gate on and off, on the same queries. The instructive part is that the first version scored 0.93 balanced accuracy against gibberish and blocked only 26% of realistic unanswerable queries — gibberish sits far from everything in embedding space and validates almost any threshold. Recalibrating on real out-of-index questions, then switching to a cross-encoder signal, took it to 85%.</p>
+
+<h4>"Your MRR of 0.551 seems low."</h4>
+<p>It is lower than the 0.606 I measured earlier on a smaller corpus, and that is the honest number. Quadrupling the haystack makes retrieval harder; retrieval metrics are a property of corpus size as much as retriever quality. I report the larger-corpus figure precisely because it is the credible one.</p>
+
+<h4>"What would you do differently?"</h4>
+<p>Scale earlier. Three tuned values reversed at 19× the corpus, so a chunk of Phase 2 tuning was done at a scale that did not represent the target. I would also have tested the LLM generation path directly instead of through its own fallback — graceful degradation hid a completely dead feature for weeks.</p>
+
+<h4>"What was the hardest bug?"</h4>
+<p>The deploy that succeeded while dropping a 430&nbsp;MB file. Exit code 0, "Committing 30/30" of 31 files. The cause was our own <code>.gitignore</code> — <code>huggingface_hub</code> feeds it to the preupload API, and it carried <code>*.faiss</code> to keep build artifacts out of git. Correct for the repository, wrong for the Space, where the index is the payload. I fixed it wrongly twice — a missing LFS pattern, then commit ordering — both plausible, both untested, before reading the library source and finding the real resolution order.</p>
+
+<h4>"Why not use a vector database like Qdrant?"</h4>
+<p>Considered and rejected on measurement. FAISS HNSW searches 103k vectors in 0.57&nbsp;ms and metadata filtering already exists in the retriever. Qdrant would have added a Docker dependency and a day of work to gain a keyword. At a scale that outgrows one machine the answer changes.</p>
+
+<h3>13.4 Questions to ask them</h3>
+<p>Turning the ablation habit outward reads as genuine and is hard to fake:</p>
+<ul>
+<li>"How do you decide when a retrieval change is actually an improvement — what's the eval set?"</li>
+<li>"Do your abstention or safety thresholds get re-tuned when the corpus grows?"</li>
+<li>"What's your ratio of measured defaults to inherited ones?"</li>
+</ul>
+
+<div class="find">
+<span class="lbl">The one thing to remember</span>
+<p>Every claim in this report is reproducible from the repository, and the failures are documented alongside the wins. That is the posture worth carrying into the room: not that the system is impressive, but that <strong>you know exactly what it does, what it does not, and how you established the difference.</strong></p>
+</div>
+</section>
+
+</main>
+</div>
+
+<footer class="foot">
+<p><strong>Voice RAG Field Report</strong> · Every figure reproducible from <code>benchmark.py</code>, <code>eval.py</code> and <code>scripts/faithfulness.py</code>. Corpus: 103,068 chunks, MS MARCO-XI Hindi. Hardware: RTX 4060, 8&nbsp;GB.</p>
+</footer>
+
+</div>
